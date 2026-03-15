@@ -5,7 +5,7 @@ const STUDIO_PHONE   = “90301779”;
 const STUDIO_ADDRESS = “11-р хороолол, Diamond Entertainment Lounge-ын хойд хаалга”;
 const BANK_NAME      = “Хаан банк”;
 const BANK_ACCOUNT   = “290005005070318300”;
-const ADMIN_EMAIL    = “admin@cakelystudio.mn”;
+const ADMIN_EMAIL    = “cakely1.mn@gmail.com”;
 const ADMIN_PASS     = “Cakely@2024”;
 const TIME_SLOTS     = [“10:00”,“12:00”,“14:00”,“16:00”,“18:00”,“20:00”];
 const MAX_SLOT       = 6;
@@ -296,16 +296,16 @@ return (
       fontSize: 11, fontWeight: 700, letterSpacing: "2.5px",
       textTransform: "uppercase", color: "#c084a8", marginBottom: 28,
     }}>
-      🍰 Бялуу чимэглэлийн студио
+      🍰 Cakely Studio
     </div>
 
     <h1 className="serif f2" style={{ fontSize: "clamp(40px,8vw,84px)", fontWeight: 300, lineHeight: 1.1, color: "#1a1a1a", marginBottom: 18 }}>
-      Өөрийн гараар<br />
-      <em style={{ color: "#c084a8" }}>бялуугаа чимэглэ</em>
+      Decorate your<br />
+      <em style={{ color: "#c084a8" }}>own cake.</em>
     </h1>
 
     <p className="f3" style={{ fontSize: 16, color: "#666", maxWidth: 460, lineHeight: 1.75, marginBottom: 44 }}>
-      Найзтайгаа эсвэл хосоороо ирж, мэргэжлийн зааврын дор өөрийн гэсэн хэв маягтай бялуу чимэглэж сур.
+      Найзуудаараа, гэр бүл хайртай хүмүүстэйгээ цагийг зугаатай өнгөрүүлж, өөрийн хэв маягаар бялуугаа чимэглээрэй.
     </p>
 
     <div className="f4">
@@ -315,7 +315,7 @@ return (
 
   {/* Packages */}
   <section style={{ padding: "80px clamp(16px,5vw,60px)", background: "#fff" }}>
-    <SectionHead sub="БАГЦУУД" title="Өөрт тохирохоо сонго" />
+    <SectionHead sub="БАГЦУУД" title="Багцаа сонгох" />
     <div style={{ maxWidth: 860, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(290px,1fr))", gap: 24 }}>
       {PACKAGES.map((p, i) => (
         <div
@@ -406,8 +406,8 @@ const isHoliday = holidays.includes(date);
 const validate = () => {
 const e = {};
 if (!form.name.trim()) e.name = “Нэр оруулна уу”;
-if (!/^\d{8}$/.test(form.phone.replace(/\s/g, “”))) e.phone = “8 оронтой утасны дугаар оруулна уу”;
-if (!form.email.includes(”@”)) e.email = “Зөв и-мэйл хаяг оруулна уу”;
+if (!/^\d{8}$/.test(form.phone.replace(/\s/g, “”))) e.phone = “Утасны дугаар оруулна уу”;
+if (!form.email.includes(”@”)) e.email = “Мэйл хаяг оруулна уу”;
 setErrors(e);
 return Object.keys(e).length === 0;
 };
@@ -496,7 +496,7 @@ return (
         />
 
         {isHoliday ? (
-          <YellowAlert>⚠️ Энэ өдөр амралтын өдөр тул захиалга авахгүй.</YellowAlert>
+          <YellowAlert>⚠️ Амрана.</YellowAlert>
         ) : (
           <>
             <FieldLabel>Цаг сонгоно уу</FieldLabel>
@@ -540,7 +540,7 @@ return (
     {step === 3 && (
       <div className="f1">
         <BackBtn onClick={() => setStep(2)} />
-        <h2 className="serif" style={{ fontSize: 34, marginBottom: 8 }}>Мэдээлэл оруулна уу</h2>
+        <h2 className="serif" style={{ fontSize: 34, marginBottom: 8 }}>Мэдээллээ оруулна уу</h2>
         <p style={{ color: "#888", marginBottom: 28, fontSize: 14 }}>{pkg?.name} · {date} · {time}</p>
 
         {[
@@ -704,7 +704,7 @@ boxShadow: “0 32px 80px rgba(0,0,0,.35)”,
         <FieldLabel>И-мэйл хаяг</FieldLabel>
         <input
           type="email"
-          placeholder="admin@cakelystudio.mn"
+          placeholder="cakely1.mn@gmail.com"
           value={email}
           onChange={(e) => { setEmail(e.target.value); setErr(""); }}
           autoComplete="username"
