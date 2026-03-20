@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>Cakely Studio 🎀</title>
+<title>Cakely Studio 🎀 Бялууны захиалга</title>
 <style>
 * {
   margin: 0;
@@ -12,8 +12,8 @@
 }
 
 body {
-  font-family: system-ui, -apple-system, 'Segoe UI', 'Quicksand', Roboto, Helvetica, sans-serif;
-  background: linear-gradient(145deg, #fff0f5 0%, #ffe8f0 100%);
+  font-family: system-ui, -apple-system, 'Segoe UI', 'Quicksand', Roboto, sans-serif;
+  background: linear-gradient(135deg, #fff0f5 0%, #ffe4f0 100%);
   min-height: 100vh;
   padding: 16px;
 }
@@ -25,14 +25,12 @@ body {
   border-radius: 48px;
   box-shadow: 0 20px 40px rgba(255, 105, 180, 0.15);
   overflow: hidden;
-  min-height: 90vh;
 }
 
 .content {
   padding: 28px 24px 40px;
 }
 
-/* хөөрхөн ягаан товч */
 .btn-primary {
   background: linear-gradient(135deg, #ff9acb, #ff80b5);
   color: white;
@@ -61,7 +59,6 @@ body {
   cursor: pointer;
 }
 
-/* карт */
 .card {
   background: #fffafc;
   border-radius: 32px;
@@ -71,7 +68,6 @@ body {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.02);
 }
 
-/* цагийн слотууд */
 .time-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -110,7 +106,6 @@ body {
   font-weight: 400;
 }
 
-/* input */
 .input-field {
   width: 100%;
   padding: 14px 18px;
@@ -128,7 +123,6 @@ body {
   box-shadow: 0 0 0 3px rgba(255, 154, 203, 0.1);
 }
 
-/* хэмжээ сонгогч */
 .qty-box {
   background: #fff5f9;
   border-radius: 60px;
@@ -151,7 +145,6 @@ body {
   color: #ff80b5;
 }
 
-/* степер */
 .stepper {
   display: flex;
   align-items: center;
@@ -200,7 +193,6 @@ body {
   color: #ff80b5;
 }
 
-/* админ хүснэгт */
 .admin-table {
   width: 100%;
   border-collapse: collapse;
@@ -225,13 +217,13 @@ body {
 .status-confirmed { background: #e6f9ed; color: #2ecc71; }
 .status-cancelled { background: #ffe6e6; color: #e74c3c; }
 
-.nav-bar {
-  background: white;
-  padding: 14px 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid #ffe0ed;
+.back-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  margin-bottom: 16px;
+  color: #ff80b5;
+  cursor: pointer;
 }
 </style>
 </head>
@@ -244,7 +236,7 @@ import {
   getFirestore, collection, addDoc, getDocs, query, where, updateDoc, doc 
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 import { 
-  getAuth, signInWithEmailAndPassword, signOut 
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 // Firebase Config
@@ -257,13 +249,14 @@ const firebaseConfig = {
   appId: "1:205358268388:web:d43f871258c592894891f1"
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const auth = getAuth(app);
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
 
-// ── CONFIG ──
+// CONFIG
 const PHONE = "90301779";
 const ADDRESS = "11-р хороолол, Diamond Entertainment Lounge-ын хойд хаалга";
+const BANK = "Хаан банк";
 const ACCOUNT = "290005005070318300";
 const ADMIN_EMAIL = "cakely1.mn@gmail.com";
 const ADMIN_PASS = "Cakely@2026";
@@ -273,7 +266,7 @@ const MAX_SLOT = 6;
 const PKG = {
   name: "🎀 Нэг хүний багц",
   price: 45000,
-  emoji: "✨",
+  emoji: "🍰✨",
   items: ["Бялууны кекс 1 ширхэг", "Крем + чимэглэл", "Уух зүйл 1 ширхэг", "Заавар зөвлөгөө"]
 };
 
@@ -281,7 +274,7 @@ function fmt(n) { return (n || 0).toLocaleString() + "₮"; }
 function today() { return new Date().toISOString().slice(0, 10); }
 function uid() { return Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2, 6).toUpperCase(); }
 
-// ── STATE ──
+// STATE
 let S = {
   page: "home",
   bookings: [],
@@ -291,15 +284,12 @@ let S = {
   time: "",
   qty: 1,
   form: { name: "", phone: "", email: "" },
-  errors: {},
-  adminAuthed: localStorage.getItem("ck:auth") === "1",
+  adminAuthed: false,
   adminTab: "bookings",
   adminFilter: "all"
 };
 
-function setState(patch) { Object.assign(S, patch); render(); }
-
-// ── FIRESTORE FUNCTIONS ──
+// FIRESTORE FUNCTIONS
 async function loadBookings() {
   try {
     const snap = await getDocs(collection(db, "bookings"));
@@ -307,23 +297,22 @@ async function loadBookings() {
     snap.forEach(d => list.push({ id: d.id, ...d.data() }));
     S.bookings = list;
     render();
-  } catch (e) { console.error(e); }
-}
-
-async function slotAvailable(date, time, qty) {
-  const q = query(collection(db, "bookings"), where("date", "==", date), where("time", "==", time));
-  const snap = await getDocs(q);
-  let used = 0;
-  snap.forEach(d => { if (d.data().status !== "cancelled") used += (d.data().qty || 1); });
-  return (used + qty) <= MAX_SLOT;
+  } catch (e) { console.error("load error:", e); render(); }
 }
 
 async function getSlotUsage(date, time) {
-  const q = query(collection(db, "bookings"), where("date", "==", date), where("time", "==", time));
-  const snap = await getDocs(q);
-  let used = 0;
-  snap.forEach(d => { if (d.data().status !== "cancelled") used += (d.data().qty || 1); });
-  return used;
+  try {
+    const q = query(collection(db, "bookings"), where("date", "==", date), where("time", "==", time));
+    const snap = await getDocs(q);
+    let used = 0;
+    snap.forEach(d => { if (d.data().status !== "cancelled") used += (d.data().qty || 1); });
+    return used;
+  } catch (e) { return 0; }
+}
+
+async function slotAvailable(date, time, qty) {
+  const used = await getSlotUsage(date, time);
+  return (used + qty) <= MAX_SLOT;
 }
 
 async function createBooking(data) {
@@ -333,30 +322,54 @@ async function createBooking(data) {
   } catch (e) { return false; }
 }
 
-async function updateStatus(id, status) {
+async function updateBookingStatus(id, status) {
   try { await updateDoc(doc(db, "bookings", id), { status }); return true; } 
   catch (e) { return false; }
 }
 
+// AUTH
 async function adminLogin(email, pass) {
-  try { await signInWithEmailAndPassword(auth, email, pass); S.adminAuthed = true; localStorage.setItem("ck:auth", "1"); render(); return true; } 
-  catch (e) { return false; }
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+    S.adminAuthed = true;
+    localStorage.setItem("ck:auth", "1");
+    render();
+    return true;
+  } catch (e) { return false; }
 }
 
-function adminLogout() { signOut(auth); S.adminAuthed = false; localStorage.removeItem("ck:auth"); S.page = "home"; render(); }
+function adminLogout() {
+  signOut(auth);
+  S.adminAuthed = false;
+  localStorage.removeItem("ck:auth");
+  S.page = "home";
+  render();
+}
 
-// ── RENDER ──
+// CHECK AUTH STATE ON LOAD
+onAuthStateChanged(auth, (user) => {
+  if (user && user.email === ADMIN_EMAIL) {
+    S.adminAuthed = true;
+    localStorage.setItem("ck:auth", "1");
+  } else {
+    S.adminAuthed = false;
+  }
+  loadBookings();
+});
+
+// RENDER MAIN
 function render() {
   const appDiv = document.getElementById("app");
-  appDiv.innerHTML = `<div class="app-container"><div class="content"></div></div>`;
-  const content = appDiv.querySelector(".content");
+  appDiv.innerHTML = `<div class="app-container"><div class="content" id="mainContent"></div></div>`;
+  const container = document.getElementById("mainContent");
   
-  if (S.page === "home") renderHome(content);
-  else if (S.page === "book") renderBook(content);
-  else if (S.page === "success") renderSuccess(content);
-  else if (S.page === "admin") renderAdmin(content);
+  if (S.page === "home") renderHome(container);
+  else if (S.page === "book") renderBook(container);
+  else if (S.page === "success") renderSuccess(container);
+  else if (S.page === "admin") renderAdmin(container);
 }
 
+// HOME PAGE
 function renderHome(container) {
   container.innerHTML = `
     <div style="text-align: center; margin-bottom: 32px;">
@@ -364,7 +377,6 @@ function renderHome(container) {
       <h1 style="font-size: 32px; font-weight: 700; background: linear-gradient(135deg, #ff80b5, #ff9acb); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">Cakely Studio</h1>
       <p style="color: #b85c8a;">Гар хийцийн бялууны студио</p>
     </div>
-    
     <div class="card" style="text-align: center;">
       <div style="font-size: 48px;">${PKG.emoji}</div>
       <h2 style="font-size: 24px; margin: 12px 0;">${PKG.name}</h2>
@@ -374,21 +386,20 @@ function renderHome(container) {
       </ul>
       <button class="btn-primary" id="bookBtn">📅 Захиалах</button>
     </div>
-    
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 20px;">
       <div class="card" style="text-align: center; padding: 16px;"><span style="font-size: 28px;">📍</span><p style="font-size: 12px;">${ADDRESS.split(",")[0]}</p></div>
       <div class="card" style="text-align: center; padding: 16px;"><span style="font-size: 28px;">📞</span><p style="font-size: 12px;">${PHONE}</p></div>
     </div>
-    
-    <button id="adminBtn" style="background: none; border: 1px solid #ffd0e4; border-radius: 60px; padding: 10px; width: 100%; margin-top: 20px; color: #ff80b5;">🔐 Админ</button>
+    <button id="adminBtn" style="background: none; border: 1px solid #ffd0e4; border-radius: 60px; padding: 10px; width: 100%; margin-top: 20px; color: #ff80b5; cursor: pointer;">🔐 Админ</button>
   `;
-  document.getElementById("bookBtn")?.onclick = () => setState({ page: "book", step: 1, time: "", qty: 1 });
-  document.getElementById("adminBtn")?.onclick = () => setState({ page: "admin" });
+  document.getElementById("bookBtn")?.addEventListener("click", () => { S.page = "book"; S.step = 1; S.time = ""; S.qty = 1; render(); });
+  document.getElementById("adminBtn")?.addEventListener("click", () => { S.page = "admin"; render(); });
 }
 
+// BOOKING PAGE
 function renderBook(container) {
   container.innerHTML = `
-    <button id="backHome" style="background: none; border: none; font-size: 28px; margin-bottom: 16px; color: #ff80b5;">←</button>
+    <button class="back-btn" id="backHome">←</button>
     <div class="stepper">
       ${[1, 2, 3].map(i => `
         <div class="step">
@@ -399,6 +410,7 @@ function renderBook(container) {
     </div>
   `;
   
+  // STEP 1: Package
   if (S.step === 1) {
     container.innerHTML += `
       <div class="card" id="selectPkg" style="cursor: pointer;">
@@ -409,8 +421,9 @@ function renderBook(container) {
         </div>
       </div>
     `;
-    document.getElementById("selectPkg")?.onclick = () => setState({ step: 2 });
+    document.getElementById("selectPkg")?.addEventListener("click", () => { S.step = 2; render(); });
   }
+  // STEP 2: Date & Time
   else if (S.step === 2) {
     container.innerHTML += `
       <div class="card">
@@ -425,6 +438,7 @@ function renderBook(container) {
     async function updateSlots() {
       const date = document.getElementById("datePick").value;
       const slotsDiv = document.getElementById("timeSlots");
+      if (!slotsDiv) return;
       slotsDiv.innerHTML = "";
       for (const slot of SLOTS) {
         const used = await getSlotUsage(date, slot);
@@ -433,15 +447,25 @@ function renderBook(container) {
         const slotDiv = document.createElement("div");
         slotDiv.className = `time-slot ${S.time === slot ? 'selected' : ''} ${!available ? 'disabled' : ''}`;
         slotDiv.innerHTML = `${slot}<div class="slot-info">${available ? `✨ ${left} суудал үлдсэн` : '❌ дүүрсэн'}</div>`;
-        if (available) slotDiv.onclick = () => { S.time = slot; updateSlots(); document.getElementById("nextBtn").disabled = false; };
+        if (available) {
+          slotDiv.addEventListener("click", () => { S.time = slot; updateSlots(); const btn = document.getElementById("nextBtn"); if(btn) btn.disabled = false; });
+        }
         slotsDiv.appendChild(slotDiv);
       }
     }
     
-    document.getElementById("datePick").onchange = (e) => { S.date = e.target.value; S.time = ""; updateSlots(); };
+    const datePicker = document.getElementById("datePick");
+    if (datePicker) {
+      datePicker.addEventListener("change", (e) => { S.date = e.target.value; S.time = ""; updateSlots(); });
+    }
     updateSlots();
-    document.getElementById("nextBtn").onclick = () => { if (S.time) setState({ step: 3 }); };
+    
+    const nextBtn = document.getElementById("nextBtn");
+    if (nextBtn) {
+      nextBtn.addEventListener("click", () => { if (S.time) { S.step = 3; render(); } });
+    }
   }
+  // STEP 3: Customer Info
   else if (S.step === 3) {
     container.innerHTML += `
       <div class="card">
@@ -469,14 +493,14 @@ function renderBook(container) {
       </div>
     `;
     
-    document.getElementById("qtyMinus").onclick = async () => { 
-      if (S.qty > 1) { S.qty--; document.getElementById("qtyVal").innerText = S.qty; updateSummary(); } 
-    };
-    document.getElementById("qtyPlus").onclick = async () => { 
+    let maxQty = MAX_SLOT;
+    getSlotUsage(S.date, S.time).then(used => { maxQty = MAX_SLOT - used; });
+    
+    document.getElementById("qtyMinus")?.addEventListener("click", () => { if (S.qty > 1) { S.qty--; document.getElementById("qtyVal").innerText = S.qty; updateSummary(); } });
+    document.getElementById("qtyPlus")?.addEventListener("click", async () => { 
       const used = await getSlotUsage(S.date, S.time);
-      const max = MAX_SLOT - used;
-      if (S.qty < max) { S.qty++; document.getElementById("qtyVal").innerText = S.qty; updateSummary(); }
-    };
+      if (S.qty < (MAX_SLOT - used)) { S.qty++; document.getElementById("qtyVal").innerText = S.qty; updateSummary(); }
+    });
     
     function updateSummary() {
       const summaryDiv = document.querySelector(".card div[style*='background: #fff5f9']");
@@ -491,7 +515,7 @@ function renderBook(container) {
       }
     }
     
-    document.getElementById("submitBtn").onclick = async () => {
+    document.getElementById("submitBtn")?.addEventListener("click", async () => {
       const name = document.getElementById("nameInp").value.trim();
       const phone = document.getElementById("phoneInp").value.trim();
       const email = document.getElementById("emailInp").value.trim();
@@ -516,19 +540,20 @@ function renderBook(container) {
         S.qty = 1;
         S.form = { name: "", phone: "", email: "" };
         S.time = "";
-        loadBookings();
+        await loadBookings();
       } else { alert("Алдаа гарлаа. Дахин оролдоно уу"); }
-    };
+    });
   }
   
-  document.getElementById("backHome")?.onclick = () => setState({ page: "home" });
+  document.getElementById("backHome")?.addEventListener("click", () => { S.page = "home"; render(); });
 }
 
+// SUCCESS PAGE
 function renderSuccess(container) {
   const b = S.lastBook;
-  if (!b) { setState({ page: "home" }); return; }
+  if (!b) { S.page = "home"; render(); return; }
   container.innerHTML = `
-    <div style="text-align: center; padding: 20px;">
+    <div style="text-align: center;">
       <div style="font-size: 64px;">🎉✨🍰</div>
       <h2 style="font-size: 28px; margin: 16px 0;">Захиалга амжилттай!</h2>
       <p style="color: #b85c8a;">Захиалгын дугаар: #${b.id.slice(0,8)}</p>
@@ -540,25 +565,27 @@ function renderSuccess(container) {
       <div class="card" style="background: #fff5f9;">
         <p>💳 ${BANK} · ${ACCOUNT}</p>
         <p>Гүйлгээний утга: <strong>${b.phone}</strong></p>
+        <p style="font-size: 12px; margin-top: 8px;">Төлбөр орсны дараа баталгаажуулна</p>
       </div>
       <button class="btn-primary" id="homeBtn">🏠 Нүүр хуудас</button>
     </div>
   `;
-  document.getElementById("homeBtn")?.onclick = () => setState({ page: "home" });
+  document.getElementById("homeBtn")?.addEventListener("click", () => { S.page = "home"; render(); });
 }
 
+// ADMIN PAGE - FIXED WHITE SCREEN
 function renderAdmin(container) {
-  // Админ нэвтрэх хэсэг
+  // Login form if not authenticated
   if (!S.adminAuthed) {
     container.innerHTML = `
-      <div style="text-align: center; padding: 20px;">
+      <div style="text-align: center;">
         <div class="card">
           <div style="font-size: 48px;">🔐✨</div>
           <h2 style="margin: 16px 0;">Админ нэвтрэх</h2>
           <input type="email" id="adminEmail" placeholder="И-мэйл" class="input-field">
           <input type="password" id="adminPass" placeholder="Нууц үг" class="input-field">
           <button id="loginBtn" class="btn-primary">Нэвтрэх</button>
-          <button id="backHomeAdmin" style="background: none; border: none; color: #ff80b5; margin-top: 16px;">← Нүүр рүү</button>
+          <button id="backHomeAdmin" style="background: none; border: none; color: #ff80b5; margin-top: 16px; cursor: pointer;">← Нүүр рүү</button>
           <div id="loginErr" style="color: #e74c3c; margin-top: 12px;"></div>
         </div>
       </div>
@@ -569,29 +596,29 @@ function renderAdmin(container) {
       const ok = await adminLogin(email, pass);
       if (!ok) document.getElementById("loginErr").innerText = "❌ И-мэйл эсвэл нууц үг буруу";
     });
-    document.getElementById("backHomeAdmin")?.onclick = () => setState({ page: "home" });
+    document.getElementById("backHomeAdmin")?.addEventListener("click", () => { S.page = "home"; render(); });
     return;
   }
   
-  // Админ панель (white screen зассан)
+  // Admin Panel - Fully rendered
   const pendingCount = S.bookings.filter(b => b.status === "pending").length;
   const confirmedCount = S.bookings.filter(b => b.status === "confirmed").length;
   
   container.innerHTML = `
     <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
       <div><span style="font-size: 28px;">🍰</span><span style="font-weight: 700;"> Cakely Admin</span></div>
-      <button id="logoutAdmin" style="background: #ffe0ed; border: none; padding: 8px 16px; border-radius: 40px;">Гарах</button>
+      <button id="logoutAdmin" style="background: #ffe0ed; border: none; padding: 8px 16px; border-radius: 40px; cursor: pointer;">Гарах</button>
     </div>
     
     <div style="display: flex; gap: 12px; margin-bottom: 20px;">
-      <button id="tabBookings" class="${S.adminTab === 'bookings' ? 'btn-primary' : 'btn-outline'}" style="flex: 1;">📋 Захиалгууд</button>
-      <button id="tabCalendar" class="${S.adminTab === 'calendar' ? 'btn-primary' : 'btn-outline'}" style="flex: 1;">📅 Хуваарь</button>
+      <button id="tabBookings" style="flex: 1; ${S.adminTab === 'bookings' ? 'background: linear-gradient(135deg, #ff9acb, #ff80b5); color: white;' : 'background: transparent; border: 2px solid #ff9acb; color: #ff80b5;'} border: none; border-radius: 60px; padding: 10px; font-weight: 600; cursor: pointer;">📋 Захиалгууд</button>
+      <button id="tabCalendar" style="flex: 1; ${S.adminTab === 'calendar' ? 'background: linear-gradient(135deg, #ff9acb, #ff80b5); color: white;' : 'background: transparent; border: 2px solid #ff9acb; color: #ff80b5;'} border: none; border-radius: 60px; padding: 10px; font-weight: 600; cursor: pointer;">📅 Хуваарь</button>
     </div>
     
     <div id="adminContent"></div>
   `;
   
-  const adminContent = container.querySelector("#adminContent");
+  const adminContent = document.getElementById("adminContent");
   
   if (S.adminTab === "bookings") {
     adminContent.innerHTML = `
@@ -600,35 +627,37 @@ function renderAdmin(container) {
         <div class="card" style="text-align: center;"><div style="font-size: 32px; font-weight: 700; color: #2ecc71;">${confirmedCount}</div><div>Баталгаажсан</div></div>
       </div>
       <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
-        ${["all","pending","confirmed","cancelled"].map(f => `<button class="filterBtn" data-filter="${f}" style="background:${S.adminFilter===f?'#ff9acb':'white'};border:1px solid #ffe0ed;border-radius:40px;padding:6px 16px;">${f==='all'?'Бүгд':f==='pending'?'Хүлээгэж буй':f==='confirmed'?'Баталгаажсан':'Цуцлагдсан'}</button>`).join("")}
+        ${["all","pending","confirmed","cancelled"].map(f => `<button class="filterBtn" data-filter="${f}" style="background:${S.adminFilter===f?'#ff9acb':'white'};border:1px solid #ffe0ed;border-radius:40px;padding:6px 16px;cursor:pointer;">${f==='all'?'Бүгд':f==='pending'?'Хүлээгэж буй':f==='confirmed'?'Баталгаажсан':'Цуцлагдсан'}</button>`).join("")}
       </div>
       <div class="card" style="overflow-x: auto;">
         <table class="admin-table">
-          <thead><tr><th>Нэр</th><th>Огноо/Цаг</th><th>Тоо</th><th>Үнэ</th><th>Төлөв</th><th></th></tr></thead>
+          <thead><tr><th>Нэр</th><th>Огноо/Цаг</th><th>Тоо</th><th>Үнэ</th><th>Төлөв</th><th></th></thead>
           <tbody id="bookingsList"></tbody>
-        </table>
+         </table>
       </div>
     `;
     
     const filtered = S.adminFilter === "all" ? S.bookings : S.bookings.filter(b => b.status === S.adminFilter);
-    const tbody = adminContent.querySelector("#bookingsList");
-    tbody.innerHTML = filtered.slice().reverse().map(b => `
-      <tr>
-        <td><strong>${b.name}</strong><br><span style="font-size: 10px;">${b.email}</span></td>
-        <td>${b.date}<br>${b.time}</td>
-        <td>${b.qty || 1} х</td>
-        <td>${fmt(b.price)}</td>
-        <td><span class="status-badge status-${b.status}">${b.status === 'pending' ? 'Хүлээгэж буй' : b.status === 'confirmed' ? 'Баталгаажсан' : 'Цуцлагдсан'}</span></td>
-        <td>${b.status === 'pending' ? `<button class="confirmBtn" data-id="${b.id}" style="background:#ff9acb;border:none;border-radius:40px;padding:6px 12px;color:white;">✓</button>` : ''}</td>
-      </tr>
-    `).join("");
-    
-    document.querySelectorAll(".confirmBtn").forEach(btn => {
-      btn.onclick = async () => { await updateStatus(btn.dataset.id, "confirmed"); loadBookings(); };
-    });
-    document.querySelectorAll(".filterBtn").forEach(btn => {
-      btn.onclick = () => { S.adminFilter = btn.dataset.filter; render(); };
-    });
+    const tbody = document.getElementById("bookingsList");
+    if (tbody) {
+      tbody.innerHTML = filtered.slice().reverse().map(b => `
+        <tr>
+          <td><strong>${b.name || '?'}</strong><br><span style="font-size: 10px;">${b.email || ''}</span></td>
+          <td>${b.date || ''}<br>${b.time || ''}</td>
+          <td>${b.qty || 1} х</td>
+          <td>${fmt(b.price || 0)}</td>
+          <td><span class="status-badge status-${b.status || 'pending'}">${b.status === 'pending' ? 'Хүлээгэж буй' : b.status === 'confirmed' ? 'Баталгаажсан' : 'Цуцлагдсан'}</span></td>
+          <td>${b.status === 'pending' ? `<button class="confirmBtn" data-id="${b.id}" style="background:#ff9acb;border:none;border-radius:40px;padding:6px 12px;color:white;cursor:pointer;">✓</button>` : ''}</td>
+        </tr>
+      `).join("");
+      
+      document.querySelectorAll(".confirmBtn").forEach(btn => {
+        btn.addEventListener("click", async () => { await updateBookingStatus(btn.dataset.id, "confirmed"); await loadBookings(); });
+      });
+      document.querySelectorAll(".filterBtn").forEach(btn => {
+        btn.addEventListener("click", () => { S.adminFilter = btn.dataset.filter; render(); });
+      });
+    }
   }
   else if (S.adminTab === "calendar") {
     adminContent.innerHTML = `
@@ -642,6 +671,7 @@ function renderAdmin(container) {
     async function updateDaily() {
       const date = document.getElementById("calDate").value;
       const slotsDiv = document.getElementById("dailySlots");
+      if (!slotsDiv) return;
       slotsDiv.innerHTML = "";
       for (const slot of SLOTS) {
         const used = await getSlotUsage(date, slot);
@@ -655,16 +685,17 @@ function renderAdmin(container) {
         `;
       }
     }
-    document.getElementById("calDate").onchange = updateDaily;
+    const calDate = document.getElementById("calDate");
+    if (calDate) calDate.addEventListener("change", updateDaily);
     updateDaily();
   }
   
-  document.getElementById("tabBookings")?.onclick = () => { S.adminTab = "bookings"; render(); };
-  document.getElementById("tabCalendar")?.onclick = () => { S.adminTab = "calendar"; render(); };
-  document.getElementById("logoutAdmin")?.onclick = () => adminLogout();
+  document.getElementById("tabBookings")?.addEventListener("click", () => { S.adminTab = "bookings"; render(); });
+  document.getElementById("tabCalendar")?.addEventListener("click", () => { S.adminTab = "calendar"; render(); });
+  document.getElementById("logoutAdmin")?.addEventListener("click", () => adminLogout());
 }
 
-// Start
+// INIT
 loadBookings();
 </script>
 </body>
