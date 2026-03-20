@@ -1,179 +1,546 @@
-/* SAVE THIS FILE AS: src/App.jsx */
-import { useState, useEffect, useCallback } from "react";
+<!DOCTYPE html>
 
-/* ─── Config ───────────────────────────────── */
-const STUDIO_PHONE = "90301779";
-const STUDIO_ADDRESS = "11-р хороолол, Diamond Entertainment Lounge-ын хойд хаалга";
-const BANK_NAME = "Хаан банк";
-const BANK_ACCOUNT = "290005005070318300";
-const ADMIN_EMAIL = "cakely1.mn@gmail.com";
-const ADMIN_PASS = "Cakely@2026";
-const TIME_SLOTS = ["10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
-const MAX_SLOT = 6;
+<html lang="mn">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Cakely Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+,::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:#fffaf7;color:#1a1a1a;}
+.serif{font-family:'Cormorant Garamond',serif;}
+input,select,textarea{font-family:'DM Sans',sans-serif;outline:none;border:1.5px solid #e8ddd5;border-radius:10px;padding:11px 15px;font-size:14px;background:#fff;width:100%;transition:border-color .2s,box-shadow .2s;}
+input:focus,select:focus{border-color:#c084a8;box-shadow:0 0 0 3px rgba(192,132,168,.13);}
+button{cursor:pointer;font-family:'DM Sans',sans-serif;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+.f1{animation:fadeUp .5s ease both;}
+.f2{animation:fadeUp .5s .1s ease both;}
+.f3{animation:fadeUp .5s .2s ease both;}
+.f4{animation:fadeUp .5s .3s ease both;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin{animation:spin .7s linear infinite;display:inline-block;}
+nav{position:sticky;top:0;z-index:200;height:62px;background:rgba(255,250,247,.93);backdrop-filter:blur(14px);border-bottom:1px solid #f0e6de;display:flex;align-items:center;justify-content:space-between;padding:0 clamp(16px,4vw,44px);}
+.nav-logo{background:none;border:none;display:flex;align-items:center;gap:8px;font-size:21px;font-weight:600;color:#1a1a1a;letter-spacing:.4px;}
+.page{display:none;}
+.page.active{display:block;}
+footer{background:#1a1a1a;color:#888;text-align:center;padding:30px 24px;font-size:13px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
 
-const PACKAGES = [
-  {
-    id: "solo",
-    name: "Нэг хүний багц",
-    price: 45000,
-    emoji: "🎂",
-    colorLight: "#fce7f3",
-    colorBorder: "#f9a8d4",
-    colorDark: "#be185d",
-    items: [
-      "Бялууны кекс 1 ширхэг",
-      "Крем + чимэглэл",
-      "Уух зүйл 1 ширхэг",
-      "Заавар зөвлөгөө",
-    ],
-  },
-  {
-    id: "duo",
-    name: "Хоёр хүний багц",
-    price: 80000,
-    emoji: "🎉",
-    colorLight: "#ede9fe",
-    colorBorder: "#c4b5fd",
-    colorDark: "#5b21b6",
-    items: [
-      "Бялууны кекс 2 ширхэг",
-      "Крем + чимэглэл",
-      "Уух зүйл 2 ширхэг",
-      "Заавар зөвлөгөө",
-    ],
-  },
+<script>
+// ── Config ──────────────────────────────────────────
+const PHONE="90301779";
+const ADDRESS="11-р хороолол, Diamond Entertainment Lounge-ын хойд хаалга";
+const BANK="Хаан банк";
+const ACCOUNT="290005005070318300";
+const ADMIN_EMAIL="cakely1.mn@gmail.com";
+const ADMIN_PASS="Cakely@2026";
+const SLOTS=["10:00","12:00","14:00","16:00","18:00","20:00"];
+const MAX=6;
+const PKGS=[
+  {id:"solo",name:"Нэг хүний багц",price:45000,emoji:"🎂",light:"#fce7f3",border:"#f9a8d4",dark:"#be185d",items:["Бялууны кекс 1 ширхэг","Крем + чимэглэл","Уух зүйл 1 ширхэг","Заавар зөвлөгөө"]},
+  {id:"duo",name:"Хоёр хүний багц",price:80000,emoji:"🎉",light:"#ede9fe",border:"#c4b5fd",dark:"#5b21b6",items:["Бялууны кекс 2 ширхэг","Крем + чимэглэл","Уух зүйл 2 ширхэг","Заавар зөвлөгөө"]}
 ];
+const SC={pending:"#f59e0b",confirmed:"#10b981",cancelled:"#ef4444"};
+const SL={pending:"Хүлээгдэж буй",confirmed:"Баталгаажсан",cancelled:"Цуцлагдсан"};
+const fmt=n=>n.toLocaleString()+"₮";
+const uid=()=>Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,5).toUpperCase();
+const today=()=>new Date().toISOString().slice(0,10);
 
-const STATUS_COLOR = {
-  pending: "#f59e0b",
-  confirmed: "#10b981",
-  cancelled: "#ef4444",
+// ── DB ──────────────────────────────────────────────
+const DB={
+  get(k){try{const r=localStorage.getItem(k);return r?JSON.parse(r):null;}catch{return null;}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch(e){}},
+  bookings(){return DB.get("ck:b")||[];},
+  saveBookings(v){DB.set("ck:b",v);},
+  holidays(){return DB.get("ck:h")||[];},
+  saveHolidays(v){DB.set("ck:h",v);}
 };
 
-const STATUS_LABEL = {
-  pending: "Хүлээгдэж буй",
-  confirmed: "Баталгаажсан",
-  cancelled: "Цуцлагдсан",
+// ── State ────────────────────────────────────────────
+let state={
+  page:"home",
+  bookings:DB.bookings(),
+  holidays:DB.holidays(),
+  lastBook:null,
+  bookStep:1,
+  selPkg:null,
+  selDate:today(),
+  selTime:"",
+  form:{name:"",phone:"",email:""},
+  errors:{},
+  adminAuthed:false,
+  adminTab:"bookings",
+  adminFilter:"all",
+  newHoliday:"",
+  schedDate:today()
 };
 
-const fmt = (n) => n?.toLocaleString() + "₮";
-
-const makeId = () =>
-  Date.now().toString(36).toUpperCase() +
-  Math.random().toString(36).slice(2, 5).toUpperCase();
-
-const todayStr = () => new Date().toISOString().slice(0, 10);
-
-/* ─── LocalStorage DB ───────────────────────── */
-const DB = {
-  get(key) {
-    try {
-      const r = localStorage.getItem(key);
-      return r ? JSON.parse(r) : null;
-    } catch {
-      return null;
-    }
-  },
-  set(key, val) {
-    try {
-      localStorage.setItem(key, JSON.stringify(val));
-    } catch (e) {
-      console.error("DB error", e);
-    }
-  },
-  getBookings() {
-    return DB.get("ck:bookings") || [];
-  },
-  setBookings(v) {
-    DB.set("ck:bookings", v);
-  },
-  getHolidays() {
-    return DB.get("ck:holidays") || [];
-  },
-  setHolidays(v) {
-    DB.set("ck:holidays", v);
-  },
-};
-
-/* ─── ROOT APP ─────────────────────────────── */
-export default function App() {
-  const [page, setPage] = useState("home");
-  const [bookings, setBookingsState] = useState([]);
-  const [holidays, setHolidaysState] = useState([]);
-  const [lastBook, setLastBook] = useState(null);
-
-  useEffect(() => {
-    setBookingsState(DB.getBookings());
-    setHolidaysState(DB.getHolidays());
-  }, []);
-
-  const setBookings = useCallback(
-    (list) => {
-      setBookingsState(list);
-      DB.setBookings(list);
-    },
-    []
-  );
-
-  const setHolidays = useCallback(
-    (list) => {
-      setHolidaysState(list);
-      DB.setHolidays(list);
-    },
-    []
-  );
-
-  const addBooking = useCallback(
-    (data) => {
-      const b = {
-        ...data,
-        id: makeId(),
-        status: "pending",
-        createdAt: new Date().toISOString(),
-      };
-      setBookings([...bookings, b]);
-      setLastBook(b);
-      setPage("success");
-    },
-    [bookings, setBookings]
-  );
-
-  const updateBooking = useCallback(
-    (id, patch) => {
-      setBookings(bookings.map((b) => (b.id === id ? { ...b, ...patch } : b)));
-    },
-    [bookings, setBookings]
-  );
-
-  const slotCount = (date, time) =>
-    bookings.filter(
-      (b) => b.date === date && b.time === time && b.status !== "cancelled"
-    ).length;
-
-  const shared = {
-    setPage,
-    bookings,
-    holidays,
-    setHolidays,
-    slotCount,
-    addBooking,
-    updateBooking,
-    lastBook,
-  };
-
-  return (
-    <>
-      {page === "home" && <HomePage {...shared} />}
-      {page === "book" && <BookPage {...shared} />}
-      {page === "success" && <SuccessPage {...shared} />}
-      {page === "admin" && <AdminPage {...shared} />}
-    </>
-  );
+function setState(patch){
+  Object.assign(state,typeof patch==="function"?patch(state):patch);
+  render();
 }
 
-/*
-  NOTE:
-  HomePage, BookPage, SuccessPage, AdminPage
-  components remain the same as your original code.
-  (Only quote syntax and formatting fixed here.)
-*/
+function saveBookings(list){
+  state.bookings=list;
+  DB.saveBookings(list);
+  render();
+}
+
+function saveHolidays(list){
+  state.holidays=list;
+  DB.saveHolidays(list);
+  render();
+}
+
+function slotCount(date,time){
+  return state.bookings.filter(b=>b.date===date&&b.time===time&&b.status!=="cancelled").length;
+}
+
+// ── HTML helpers ─────────────────────────────────────
+function h(tag,attrs,content){
+  const el=document.createElement(tag);
+  if(attrs)Object.keys(attrs).forEach(k=>{
+    if(k==="style"&&typeof attrs[k]==="object"){Object.assign(el.style,attrs[k]);}
+    else if(k.startsWith("on")){el.addEventListener(k.slice(2).toLowerCase(),attrs[k]);}
+    else if(k==="className"){el.className=attrs[k];}
+    else{el.setAttribute(k,attrs[k]);}
+  });
+  if(content instanceof Node){el.appendChild(content);}
+  else if(Array.isArray(content)){content.forEach(c=>{if(c)el.appendChild(c instanceof Node?c:document.createTextNode(String(c)));});}
+  else if(content!=null){el.appendChild(document.createTextNode(String(content)));}
+  return el;
+}
+function div(attrs,content){return h("div",attrs,content);}
+function btn(attrs,content){return h("button",attrs,content);}
+function p(attrs,content){return h("p",attrs,content);}
+function span(attrs,content){return h("span",attrs,content);}
+function inp(attrs){return h("input",attrs);}
+function txt(t){return document.createTextNode(t);}
+
+// ── Nav ──────────────────────────────────────────────
+function renderNav(active){
+  const nav=document.createElement("nav");
+  const logo=btn({className:"nav-logo",onClick:()=>setState({page:"home"})},
+    [span({style:{fontSize:"22px"}},"🎂"), span({className:"serif",style:{fontSize:"21px",fontWeight:"600"}},"Cakely Studio")]
+  );
+  const right=div({style:{display:"flex",gap:"6px",alignItems:"center"}},[
+    ...["home|Нүүр","book|Захиалах"].map(s=>{
+      const [k,l]=s.split("|");
+      return btn({
+        style:{background:active===k?"#1a1a1a":"transparent",color:active===k?"#fff":"#555",border:"none",borderRadius:"8px",padding:"7px 16px",fontSize:"13px",fontWeight:"500"},
+        onClick:()=>setState({page:k})
+      },l);
+    }),
+    btn({style:{background:"transparent",color:"#bbb",border:"1px solid #e8ddd5",borderRadius:"8px",padding:"7px 13px",fontSize:"12px",marginLeft:"4px"},onClick:()=>setState({page:"admin"})},"⚙")
+  ]);
+  nav.appendChild(logo);
+  nav.appendChild(right);
+  return nav;
+}
+
+// ── Home ─────────────────────────────────────────────
+function renderHome(){
+  const wrap=div({});
+  wrap.appendChild(renderNav("home"));
+
+  // Hero
+  const hero=div({style:{minHeight:"88vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"60px 24px",background:"linear-gradient(150deg,#fff5f0 0%,#fdf0fa 55%,#f0eeff 100%)",position:"relative",overflow:"hidden"}});
+  const badge=div({className:"f1",style:{display:"inline-flex",alignItems:"center",gap:"8px",background:"rgba(255,255,255,.75)",border:"1px solid #f0e6de",borderRadius:"100px",padding:"6px 20px",fontSize:"11px",fontWeight:"700",letterSpacing:"2.5px",textTransform:"uppercase",color:"#c084a8",marginBottom:"28px"}},"🍰 Бялуу чимэглэлийн студио");
+  const title=h("h1",{className:"serif f2",style:{fontSize:"clamp(40px,8vw,84px)",fontWeight:"300",lineHeight:"1.1",color:"#1a1a1a",marginBottom:"18px"}});
+  title.innerHTML="<em style='color:#c084a8'>Decorate your own cake</em>";
+  const sub=p({className:"f3",style:{fontSize:"16px",color:"#666",maxWidth:"460px",lineHeight:"1.75",marginBottom:"44px"}},"Дотны хүмүүстэйгээ дулаахан цагийг өнгөрүүлээрэй.");
+  const cta=btn({className:"f4",style:{background:"#1a1a1a",color:"#fff",border:"none",borderRadius:"13px",padding:"14px 36px",fontSize:"15px",fontWeight:"600",boxShadow:"0 6px 24px rgba(0,0,0,.16)"},onClick:()=>setState({page:"book"})},"Цаг захиалах →");
+  hero.appendChild(badge);hero.appendChild(title);hero.appendChild(sub);hero.appendChild(cta);
+  wrap.appendChild(hero);
+
+  // Packages
+  const pkgSec=div({style:{padding:"80px clamp(16px,5vw,60px)",background:"#fff"}});
+  const pkgHead=div({style:{textAlign:"center",marginBottom:"52px"}});
+  pkgHead.appendChild(p({style:{fontSize:"10px",fontWeight:"700",letterSpacing:"2.5px",textTransform:"uppercase",color:"#c084a8",marginBottom:"10px"}},"БАГЦУУД"));
+  pkgHead.appendChild(h("h2",{className:"serif",style:{fontSize:"42px",fontWeight:"400"}},"Өөрт тохирохоо сонго"));
+  pkgSec.appendChild(pkgHead);
+  const grid=div({style:{maxWidth:"860px",margin:"0 auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(290px,1fr))",gap:"24px"}});
+  PKGS.forEach(p_=>{
+    const card=div({style:{border:"2px solid "+p_.border,borderRadius:"24px",padding:"36px",background:"#fff",position:"relative",overflow:"hidden"}});
+    card.innerHTML=`
+      <div style="position:absolute;top:-24px;right:-24px;width:110px;height:110px;border-radius:50%;background:${p_.light};opacity:.55"></div>
+      <div style="font-size:40px;margin-bottom:16px">${p_.emoji}</div>
+      <h3 class="serif" style="font-size:26px;font-weight:600;margin-bottom:4px">${p_.name}</h3>
+      <p style="font-size:28px;font-weight:700;color:${p_.dark};margin-bottom:24px">${fmt(p_.price)}</p>
+      <ul style="list-style:none;display:flex;flex-direction:column;gap:10px">
+        ${p_.items.map(it=>`<li style="display:flex;align-items:center;gap:10px;font-size:14px;color:#444"><span style="width:6px;height:6px;border-radius:50%;background:${p_.dark};flex-shrink:0"></span>${it}</li>`).join("")}
+      </ul>
+    `;
+    const ob=btn({style:{marginTop:"28px",width:"100%",background:p_.dark,color:"#fff",border:"none",borderRadius:"12px",padding:"13px 0",fontWeight:"600",fontSize:"14px"}},
+      "Захиалах");
+    ob.addEventListener("click",()=>setState({page:"book"}));
+    card.appendChild(ob);
+    grid.appendChild(card);
+  });
+  pkgSec.appendChild(grid);
+  wrap.appendChild(pkgSec);
+
+  // Info
+  const infoSec=div({style:{padding:"72px clamp(16px,5vw,60px)",background:"#fffaf7"}});
+  const infoGrid=div({style:{maxWidth:"860px",margin:"0 auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:"20px"}});
+  [{icon:"📍",label:"Хаяг",val:ADDRESS},{icon:"📞",label:"Утас",val:PHONE},{icon:"🕙",label:"Цагийн хуваарь",val:"10:00 – 20:00 (2 цагийн сешн)"}].forEach(it=>{
+    const card=div({style:{background:"#fff",borderRadius:"20px",padding:"28px",border:"1px solid #f0e6de",boxShadow:"0 2px 14px rgba(0,0,0,.04)"}});
+    card.innerHTML=`<div style="font-size:26px;margin-bottom:12px">${it.icon}</div><p style="font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:#c084a8;margin-bottom:6px">${it.label}</p><p style="font-size:14px;color:#333;line-height:1.6">${it.val}</p>`;
+    infoGrid.appendChild(card);
+  });
+  infoSec.appendChild(infoGrid);
+  wrap.appendChild(infoSec);
+
+  const foot=document.createElement("footer");
+  foot.innerHTML=`<p class="serif" style="font-size:20px;color:#fff;margin-bottom:5px">Cakely Studio</p><p>${PHONE} · ${ADDRESS}</p>`;
+  wrap.appendChild(foot);
+  return wrap;
+}
+
+// ── Book ─────────────────────────────────────────────
+function renderBook(){
+  const wrap=div({});
+  wrap.appendChild(renderNav("book"));
+  const inner=div({style:{maxWidth:"580px",margin:"0 auto",padding:"48px clamp(16px,4vw,32px)"}});
+
+  // Stepper
+  const stepper=div({style:{display:"flex",alignItems:"center",marginBottom:"46px"}});
+  ["Багц","Цаг","Мэдээлэл"].forEach((s,i)=>{
+    const dot=div({style:{width:"30px",height:"30px",borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"12px",fontWeight:"700",flexShrink:"0",background:state.bookStep>i+1?"#1a1a1a":state.bookStep===i+1?"#c084a8":"#f0e6de",color:state.bookStep>=i+1?"#fff":"#bbb"}},state.bookStep>i+1?"✓":String(i+1));
+    const lbl=span({style:{marginLeft:"7px",fontSize:"13px",fontWeight:"500",whiteSpace:"nowrap",color:state.bookStep===i+1?"#1a1a1a":"#bbb"}},s);
+    stepper.appendChild(dot);stepper.appendChild(lbl);
+    if(i<2){stepper.appendChild(div({style:{flex:"1",height:"1px",background:state.bookStep>i+1?"#1a1a1a":"#e8ddd5",margin:"0 10px"}}));}
+  });
+  inner.appendChild(stepper);
+
+  const isHoliday=state.holidays.includes(state.selDate);
+
+  if(state.bookStep===1){
+    inner.appendChild(h("h2",{className:"serif f1",style:{fontSize:"34px",marginBottom:"8px"}},"Багц сонгоно уу"));
+    inner.appendChild(p({style:{color:"#888",marginBottom:"28px",fontSize:"14px"}},"Танд тохирох багцаа сонгоно уу"));
+    const list=div({style:{display:"flex",flexDirection:"column",gap:"14px"}});
+    PKGS.forEach(pk=>{
+      const card=btn({style:{border:"2px solid "+(state.selPkg?.id===pk.id?pk.dark:pk.border),borderRadius:"18px",padding:"22px 26px",background:state.selPkg?.id===pk.id?pk.light:"#fff",display:"flex",alignItems:"center",gap:"18px",transition:"all .18s",textAlign:"left",width:"100%"}});
+      card.innerHTML=`<span style="font-size:32px">${pk.emoji}</span><div style="flex:1"><p style="font-weight:700;font-size:15px;color:#1a1a1a;margin-bottom:3px">${pk.name}</p><p style="font-size:12px;color:#888">${pk.items.join(" · ")}</p></div><p style="font-size:18px;font-weight:700;color:${pk.dark};white-space:nowrap">${fmt(pk.price)}</p>`;
+      card.addEventListener("click",()=>setState({selPkg:pk,bookStep:2}));
+      list.appendChild(card);
+    });
+    inner.appendChild(list);
+  }
+
+  else if(state.bookStep===2){
+    const back=btn({style:{background:"none",border:"none",color:"#999",fontSize:"13px",marginBottom:"22px",display:"flex",alignItems:"center",gap:"5px"},onClick:()=>setState({bookStep:1})},"← Буцах");
+    inner.appendChild(back);
+    inner.appendChild(h("h2",{className:"serif f1",style:{fontSize:"34px",marginBottom:"8px"}},"Өдөр, цаг сонгоно уу"));
+    const subP=p({style:{color:"#888",marginBottom:"28px",fontSize:"14px"}});
+    subP.innerHTML="Сонгосон багц: <strong style='color:#1a1a1a'>"+state.selPkg?.name+"</strong>";
+    inner.appendChild(subP);
+    inner.appendChild(h("label",{style:{display:"block",marginBottom:"7px",fontSize:"13px",fontWeight:"600",color:"#555"}},"Өдөр"));
+    const di=inp({type:"date",value:state.selDate,min:today()});
+    di.addEventListener("change",e=>setState({selDate:e.target.value,selTime:""}));
+    di.style.marginBottom="24px";
+    inner.appendChild(di);
+
+    if(isHoliday){
+      inner.appendChild(div({style:{background:"#fef3c7",border:"1px solid #fcd34d",borderRadius:"10px",padding:"12px 16px",marginBottom:"20px",fontSize:"13px",color:"#92400e"}},"⚠️ Энэ өдөр амралтын өдөр тул захиалга авахгүй."));
+    } else {
+      inner.appendChild(h("label",{style:{display:"block",marginBottom:"12px",fontSize:"13px",fontWeight:"600",color:"#555"}},"Цаг сонгоно уу"));
+      const tGrid=div({style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"28px"}});
+      SLOTS.forEach(t=>{
+        const used=slotCount(state.selDate,t),left=MAX-used,full=left<=0,sel=state.selTime===t;
+        const tb=btn({style:{border:"2px solid "+(sel?"#1a1a1a":full?"#f0e6de":"#e8ddd5"),borderRadius:"12px",padding:"12px 8px",background:sel?"#1a1a1a":full?"#fafafa":"#fff",color:sel?"#fff":full?"#ccc":"#1a1a1a",cursor:full?"not-allowed":"pointer"}});
+        tb.disabled=full;
+        tb.innerHTML=`<p style="font-weight:700;font-size:15px">${t}</p><p style="font-size:11px;margin-top:3px;color:${sel?"#ddd":full?"#ccc":left<=2?"#f59e0b":"#6b7280"}">${full?"Дүүрсэн":left+" суудал"}</p>`;
+        tb.addEventListener("click",()=>setState({selTime:t}));
+        tGrid.appendChild(tb);
+      });
+      inner.appendChild(tGrid);
+      const nb=btn({style:{width:"100%",background:state.selTime?"#1a1a1a":"#e5e7eb",color:state.selTime?"#fff":"#9ca3af",border:"none",borderRadius:"13px",padding:"14px 0",fontSize:"15px",fontWeight:"600"},onClick:()=>{if(state.selTime)setState({bookStep:3});}},"Үргэлжлүүлэх →");
+      nb.disabled=!state.selTime;
+      inner.appendChild(nb);
+    }
+  }
+
+  else if(state.bookStep===3){
+    inner.appendChild(btn({style:{background:"none",border:"none",color:"#999",fontSize:"13px",marginBottom:"22px",display:"flex",alignItems:"center",gap:"5px"},onClick:()=>setState({bookStep:2})},"← Буцах"));
+    inner.appendChild(h("h2",{className:"serif f1",style:{fontSize:"34px",marginBottom:"8px"}},"Мэдээлэл оруулна уу"));
+    inner.appendChild(p({style:{color:"#888",marginBottom:"28px",fontSize:"14px"}},state.selPkg?.name+" · "+state.selDate+" · "+state.selTime));
+
+    [{key:"name",label:"Нэр",ph:"Таны нэр",type:"text"},{key:"phone",label:"Утас",ph:"99999999",type:"tel"},{key:"email",label:"И-мэйл",ph:"email@example.com",type:"email"}].forEach(f=>{
+      const fw=div({style:{marginBottom:"18px"}});
+      fw.appendChild(h("label",{style:{display:"block",marginBottom:"7px",fontSize:"13px",fontWeight:"600",color:"#555"}},f.label));
+      const fi=inp({type:f.type,placeholder:f.ph,value:state.form[f.key]});
+      fi.style.borderColor=state.errors[f.key]?"#f87171":"#e8ddd5";
+      fi.addEventListener("input",e=>{ state.form[f.key]=e.target.value; });
+      fw.appendChild(fi);
+      if(state.errors[f.key])fw.appendChild(p({style:{fontSize:"12px",color:"#ef4444",marginTop:"4px"}},state.errors[f.key]));
+      inner.appendChild(fw);
+    });
+
+    const sumBox=div({style:{background:"#f9f5ff",border:"1px solid #e9d5ff",borderRadius:"14px",padding:"18px",marginBottom:"24px"}});
+    sumBox.innerHTML=`<p style="font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:10px">📋 ЗАХИАЛГЫН ДЭЛГЭРЭНГҮЙ</p>${[["Багц",state.selPkg?.name],["Өдөр",state.selDate],["Цаг",state.selTime],["Үнэ",fmt(state.selPkg?.price)]].map(([k,v])=>`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:6px"><span style="color:#888">${k}</span><span style="font-weight:600">${v}</span></div>`).join("")}`;
+    inner.appendChild(sumBox);
+
+    const sb=btn({style:{width:"100%",background:"#c084a8",color:"#fff",border:"none",borderRadius:"12px",padding:"15px 0",fontWeight:"700",fontSize:"15px",boxShadow:"0 4px 18px rgba(192,132,168,.38)"},onClick:()=>{
+      const e={};
+      if(!state.form.name.trim())e.name="Нэр оруулна уу";
+      if(!/^\d{8}$/.test(state.form.phone.replace(/\s/g,"")))e.phone="8 оронтой утасны дугаар";
+      if(!state.form.email.includes("@"))e.email="Зөв и-мэйл оруулна уу";
+      if(Object.keys(e).length){setState({errors:e});return;}
+      const b={...state.form,date:state.selDate,time:state.selTime,package:state.selPkg.id,packageName:state.selPkg.name,price:state.selPkg.price,id:uid(),status:"pending",createdAt:new Date().toISOString()};
+      const nb=[...state.bookings,b];
+      DB.saveBookings(nb);
+      setState({bookings:nb,lastBook:b,page:"success",bookStep:1,form:{name:"",phone:"",email:""},errors:{},selPkg:null,selTime:""});
+    }},"Захиалга илгээх 🎂");
+    inner.appendChild(sb);
+  }
+
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+// ── Success ──────────────────────────────────────────
+function renderSuccess(){
+  const b=state.lastBook;
+  if(!b){setState({page:"home"});return div({});}
+  const pkg=PKGS.find(p=>p.id===b.package);
+  const wrap=div({style:{minHeight:"100vh",background:"linear-gradient(135deg,#fff5f0,#f5f0ff)",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px"}});
+  const card=div({style:{maxWidth:"480px",width:"100%",background:"#fff",borderRadius:"28px",padding:"44px 36px",textAlign:"center",boxShadow:"0 20px 60px rgba(0,0,0,.08)"}});
+  card.innerHTML=`
+    <div style="font-size:56px;margin-bottom:14px">🎉</div>
+    <h2 class="serif" style="font-size:34px;margin-bottom:8px">Захиалга амжилттай!</h2>
+    <p style="color:#888;margin-bottom:28px;font-size:14px;line-height:1.75">Захиалгын дугаар: <strong style="color:#1a1a1a">#${b.id}</strong><br>Та <strong>${b.email}</strong>-руу баталгаажих и-мэйл хүлээж авна.</p>
+    <div style="background:#fdf4ff;border:1px dashed #e9d5ff;border-radius:14px;padding:18px;margin-bottom:20px;text-align:left">
+      ${[["Багц",pkg?.name],["Өдөр",b.date],["Цаг",b.time],["Нэр",b.name],["Утас",b.phone],["Үнэ",fmt(pkg?.price)]].map(([k,v])=>`<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:7px"><span style="color:#888">${k}</span><span style="font-weight:600">${v}</span></div>`).join("")}
+    </div>
+    <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:12px;padding:16px;margin-bottom:26px;text-align:left;font-size:13px">
+      <p style="font-weight:700;color:#c2410c;margin-bottom:8px">💳 Төлбөр шилжүүлэх</p>
+      <p style="color:#555;line-height:1.8"><strong>${BANK}</strong> · <strong>${ACCOUNT}</strong><br>Гүйлгээний утга: <strong>${b.phone}</strong><br>Дүн: <strong style="color:#c2410c">${fmt(pkg?.price)}</strong></p>
+      <p style="margin-top:8px;color:#aaa;font-size:12px">Төлбөр орсны дараа админ баталгаажуулж и-мэйл илгээнэ.</p>
+    </div>
+  `;
+  const hb=btn({style:{width:"100%",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:"13px",padding:"14px 0",fontSize:"15px",fontWeight:"600"},onClick:()=>setState({page:"home"})},"Нүүр хуудас руу буцах");
+  card.appendChild(hb);
+  wrap.appendChild(card);
+  return wrap;
+}
+
+// ── Admin ────────────────────────────────────────────
+function renderAdminLogin(){
+  const wrap=div({style:{minHeight:"100vh",background:"linear-gradient(135deg,#1a1a1a,#2d1b2e)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}});
+  const card=div({style:{background:"#fff",borderRadius:"28px",padding:"48px 40px",width:"100%",maxWidth:"400px",boxShadow:"0 32px 80px rgba(0,0,0,.35)"}});
+  card.innerHTML=`<div style="text-align:center;margin-bottom:32px"><div style="font-size:40px;margin-bottom:8px">🎂</div><h1 class="serif" style="font-size:26px;font-weight:600">Cakely Studio</h1><p style="font-size:13px;color:#aaa;margin-top:4px">Админ удирдлагын систем</p></div><div style="height:1px;background:#f0e6de;margin-bottom:28px"></div>`;
+  const emailW=div({style:{marginBottom:"16px"}});
+  emailW.appendChild(h("label",{style:{display:"block",marginBottom:"7px",fontSize:"13px",fontWeight:"600",color:"#555"}},"И-мэйл хаяг"));
+  const ei=inp({type:"email",placeholder:"cakely1.mn@gmail.com",id:"adminEmail"});
+  emailW.appendChild(ei);
+  card.appendChild(emailW);
+  const pwW=div({style:{marginBottom:"20px",position:"relative"}});
+  pwW.appendChild(h("label",{style:{display:"block",marginBottom:"7px",fontSize:"13px",fontWeight:"600",color:"#555"}},"Нууц үг"));
+  const pi=inp({type:"password",placeholder:"••••••••",id:"adminPw"});
+  pwW.appendChild(pi);
+  card.appendChild(pwW);
+  const errDiv=div({style:{display:"none",background:"#fef2f2",border:"1px solid #fecaca",borderRadius:"9px",padding:"10px 14px",marginBottom:"16px",fontSize:"13px",color:"#dc2626"}});
+  card.appendChild(errDiv);
+  const lb=btn({style:{width:"100%",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:"12px",padding:"14px 0",fontWeight:"600",fontSize:"15px"},onClick:()=>{
+    const e=ei.value.trim().toLowerCase(),pw=pi.value;
+    if(e===ADMIN_EMAIL&&pw===ADMIN_PASS){setState({adminAuthed:true});}
+    else{errDiv.style.display="block";errDiv.textContent="⚠️ И-мэйл эсвэл нууц үг буруу байна.";}
+  }},"Нэвтрэх");
+  card.appendChild(lb);
+  card.appendChild(btn({style:{display:"block",margin:"16px auto 0",background:"none",border:"none",color:"#bbb",fontSize:"13px"},onClick:()=>setState({page:"home"})},"← Нүүр хуудасруу буцах"));
+  wrap.appendChild(card);
+  return wrap;
+}
+
+function renderAdmin(){
+  if(!state.adminAuthed)return renderAdminLogin();
+  const wrap=div({style:{minHeight:"100vh",background:"#f7f7f7"}});
+
+  // Top bar
+  const topBar=div({style:{background:"#1a1a1a",color:"#fff",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"0 clamp(16px,4vw,40px)",height:"58px"}});
+  const left=div({style:{display:"flex",alignItems:"center",gap:"10px"}});
+  left.innerHTML=`<span style="font-size:18px">🎂</span><span class="serif" style="font-size:18px;font-weight:600">Cakely Admin</span><span style="font-size:11px;background:rgba(255,255,255,.12);border-radius:6px;padding:2px 8px;color:#ddd">${ADMIN_EMAIL}</span>`;
+  const right=div({style:{display:"flex",gap:"6px",alignItems:"center"}});
+  [["bookings","📋 Захиалгууд"],["calendar","📅 Хуваарь"]].forEach(([k,l])=>{
+    right.appendChild(btn({style:{background:state.adminTab===k?"rgba(255,255,255,.15)":"none",border:"none",color:state.adminTab===k?"#fff":"#999",borderRadius:"8px",padding:"6px 14px",fontSize:"13px",fontWeight:"500"},onClick:()=>setState({adminTab:k})},l));
+  });
+  right.appendChild(btn({style:{background:"none",border:"1px solid #444",color:"#888",borderRadius:"8px",padding:"5px 12px",fontSize:"12px",marginLeft:"8px"},onClick:()=>setState({adminAuthed:false})},"Гарах"));
+  topBar.appendChild(left);topBar.appendChild(right);
+  wrap.appendChild(topBar);
+
+  const inner=div({style:{maxWidth:"1060px",margin:"0 auto",padding:"28px clamp(12px,3vw,28px)"}});
+
+  if(state.adminTab==="bookings"){
+    // Stats
+    const stats=div({style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"14px",marginBottom:"28px"}});
+    [{label:"Нийт",val:state.bookings.length,color:"#6366f1"},{label:"Хүлээгдэж буй",val:state.bookings.filter(b=>b.status==="pending").length,color:"#f59e0b"},{label:"Баталгаажсан",val:state.bookings.filter(b=>b.status==="confirmed").length,color:"#10b981"},{label:"Цуцлагдсан",val:state.bookings.filter(b=>b.status==="cancelled").length,color:"#ef4444"}].forEach(s=>{
+      const c=div({style:{background:"#fff",borderRadius:"14px",padding:"18px 22px",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
+      c.innerHTML=`<p style="font-size:30px;font-weight:700;color:${s.color}">${s.val}</p><p style="font-size:12px;color:#888;margin-top:2px">${s.label}</p>`;
+      stats.appendChild(c);
+    });
+    inner.appendChild(stats);
+
+    // Filter
+    const filt=div({style:{display:"flex",gap:"7px",marginBottom:"16px",flexWrap:"wrap"}});
+    [["all","Бүгд"],["pending","Хүлээгдэж буй"],["confirmed","Баталгаажсан"],["cancelled","Цуцлагдсан"]].forEach(([k,l])=>{
+      filt.appendChild(btn({style:{background:state.adminFilter===k?"#1a1a1a":"#fff",color:state.adminFilter===k?"#fff":"#666",border:"1px solid #e8ddd5",borderRadius:"8px",padding:"7px 16px",fontSize:"13px",fontWeight:"500"},onClick:()=>setState({adminFilter:k})},l));
+    });
+    inner.appendChild(filt);
+
+    const filtered=state.adminFilter==="all"?state.bookings:state.bookings.filter(b=>b.status===state.adminFilter);
+    const tableWrap=div({style:{background:"#fff",borderRadius:"18px",overflow:"hidden",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
+    if(filtered.length===0){
+      tableWrap.appendChild(div({style:{padding:"48px",textAlign:"center",color:"#bbb",fontSize:"14px"}},"Захиалга байхгүй байна"));
+    } else {
+      const ow=div({style:{overflowX:"auto"}});
+      const tbl=document.createElement("table");
+      tbl.style.cssText="width:100%;border-collapse:collapse";
+      const thead=document.createElement("thead");
+      const hr=document.createElement("tr");
+      hr.style.cssText="background:#fafafa;border-bottom:1px solid #f0e6de";
+      ["#ID","Нэр","Утас","И-мэйл","Багц","Өдөр","Цаг","Үнэ","Төлөв","Үйлдэл"].forEach(h_=>{
+        const th=document.createElement("th");
+        th.style.cssText="padding:11px 14px;text-align:left;font-size:11px;font-weight:700;color:#999;letter-spacing:1px;text-transform:uppercase;white-space:nowrap";
+        th.textContent=h_;
+        hr.appendChild(th);
+      });
+      thead.appendChild(hr);tbl.appendChild(thead);
+      const tbody=document.createElement("tbody");
+      filtered.slice().reverse().forEach((b,i)=>{
+        const pkg=PKGS.find(p=>p.id===b.package);
+        const tr=document.createElement("tr");
+        tr.style.cssText="border-bottom:1px solid #f8f8f8;background:"+(i%2===0?"#fff":"#fafafa");
+        const cells=[
+          ["#"+b.id,"font-size:11px;font-weight:700;color:#bbb"],
+          [b.name,"font-size:13px;font-weight:600"],
+          [b.phone,"font-size:13px"],
+          [b.email,"font-size:12px;color:#777;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"],
+          [pkg?.name,"font-size:12px"],
+          [b.date,"font-size:13px;font-weight:600"],
+          [b.time,"font-size:13px"],
+          [fmt(b.price),"font-size:13px;font-weight:700;color:#5b21b6"],
+        ];
+        cells.forEach(([v,s])=>{
+          const td=document.createElement("td");
+          td.style.cssText="padding:11px 14px;"+s;
+          td.textContent=v||"";
+          tr.appendChild(td);
+        });
+        // Status
+        const std=document.createElement("td");
+        std.style.padding="11px 14px";
+        const stBadge=span({style:{background:SC[b.status]+"22",color:SC[b.status],borderRadius:"100px",padding:"3px 10px",fontSize:"11px",fontWeight:"700",whiteSpace:"nowrap"}},SL[b.status]);
+        std.appendChild(stBadge);tr.appendChild(std);
+        // Actions
+        const atd=document.createElement("td");
+        atd.style.padding="11px 14px";
+        const abx=div({style:{display:"flex",gap:"5px"}});
+        if(b.status==="pending"){
+          const cb=btn({style:{background:"#10b981",color:"#fff",border:"none",borderRadius:"7px",padding:"5px 10px",fontSize:"11px",fontWeight:"600",whiteSpace:"nowrap"},onClick:()=>{
+            const nb=state.bookings.map(x=>x.id===b.id?{...x,status:"confirmed"}:x);
+            saveBookings(nb);
+          }},"✓ Баталгаажуулах");
+          abx.appendChild(cb);
+        }
+        if(b.status!=="cancelled"){
+          const xb=btn({style:{background:"#ef4444",color:"#fff",border:"none",borderRadius:"7px",padding:"5px 10px",fontSize:"11px",fontWeight:"600"},onClick:()=>{
+            const nb=state.bookings.map(x=>x.id===b.id?{...x,status:"cancelled"}:x);
+            saveBookings(nb);
+          }},"✕");
+          abx.appendChild(xb);
+        }
+        atd.appendChild(abx);tr.appendChild(atd);
+        tbody.appendChild(tr);
+      });
+      tbl.appendChild(tbody);ow.appendChild(tbl);tableWrap.appendChild(ow);
+    }
+    inner.appendChild(tableWrap);
+  }
+
+  else if(state.adminTab==="calendar"){
+    inner.appendChild(h("h2",{className:"serif",style:{fontSize:"28px",marginBottom:"6px"}},"Хуваарь удирдах"));
+    inner.appendChild(p({style:{color:"#999",fontSize:"14px",marginBottom:"36px"}},"Амралтын өдөр тохируулах ба өдрийн захиалгын байдал харах"));
+    const grid=div({style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:"28px"}});
+
+    // Holidays
+    const hCard=div({style:{background:"#fff",borderRadius:"18px",padding:"24px",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
+    hCard.appendChild(h("h3",{style:{fontSize:"15px",fontWeight:"700",marginBottom:"16px"}},"🛑 Амралтын өдрүүд"));
+    const hRow=div({style:{display:"flex",gap:"8px",marginBottom:"16px"}});
+    const hInp=inp({type:"date",value:state.newHoliday});
+    hInp.style.flex="1";
+    hInp.addEventListener("change",e=>{ state.newHoliday=e.target.value; });
+    hRow.appendChild(hInp);
+    hRow.appendChild(btn({style:{background:"#1a1a1a",color:"#fff",border:"none",borderRadius:"9px",padding:"0 18px",fontWeight:"600",fontSize:"13px",whiteSpace:"nowrap"},onClick:()=>{
+      if(state.newHoliday&&!state.holidays.includes(state.newHoliday)){
+        saveHolidays([...state.holidays,state.newHoliday].sort());
+        state.newHoliday="";hInp.value="";
+      }
+    }},"+ Нэмэх"));
+    hCard.appendChild(hRow);
+    if(state.holidays.length===0){
+      hCard.appendChild(p({style:{color:"#ccc",fontSize:"13px"}},"Амралтын өдөр байхгүй"));
+    } else {
+      const hList=div({style:{display:"flex",flexWrap:"wrap",gap:"8px"}});
+      state.holidays.forEach(hd=>{
+        const chip=div({style:{background:"#fff7ed",border:"1px solid #fed7aa",borderRadius:"9px",padding:"7px 12px",display:"flex",alignItems:"center",gap:"8px",fontSize:"13px"}});
+        chip.appendChild(txt("📅 "+hd));
+        chip.appendChild(btn({style:{background:"#fee2e2",color:"#ef4444",border:"none",borderRadius:"5px",padding:"1px 7px",fontSize:"12px",fontWeight:"700"},onClick:()=>saveHolidays(state.holidays.filter(x=>x!==hd))},"✕"));
+        hList.appendChild(chip);
+      });
+      hCard.appendChild(hList);
+    }
+    grid.appendChild(hCard);
+
+    // Schedule
+    const sCard=div({style:{background:"#fff",borderRadius:"18px",padding:"24px",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
+    sCard.appendChild(h("h3",{style:{fontSize:"15px",fontWeight:"700",marginBottom:"16px"}},"📊 Өдрийн захиалгын байдал"));
+    const sInp=inp({type:"date",value:state.schedDate});
+    sInp.style.marginBottom="16px";
+    sInp.addEventListener("change",e=>setState({schedDate:e.target.value}));
+    sCard.appendChild(sInp);
+    if(state.holidays.includes(state.schedDate)){
+      sCard.appendChild(div({style:{background:"#fef3c7",border:"1px solid #fcd34d",borderRadius:"10px",padding:"12px 16px",fontSize:"13px",color:"#92400e"}},"⚠️ Амралтын өдөр – захиалга авахгүй"));
+    } else {
+      const sg=div({style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"8px"}});
+      SLOTS.forEach(t=>{
+        const list=state.bookings.filter(b=>b.date===state.schedDate&&b.time===t&&b.status!=="cancelled");
+        const left=MAX-list.length;
+        const sc=div({style:{border:"1px solid #f0e6de",borderRadius:"12px",padding:"12px 10px",background:left===0?"#fff5f5":"#fff"}});
+        sc.innerHTML=`<p style="font-weight:700;font-size:15px;margin-bottom:3px">${t}</p><p style="font-size:11px;font-weight:700;color:${left===0?"#ef4444":left<=2?"#f59e0b":"#10b981"}">${left===0?"Дүүрсэн":list.length+"/"+MAX}</p>${list.map(b=>`<p style="font-size:10px;color:#999;margin-top:3px">• ${b.name}</p>`).join("")}`;
+        sg.appendChild(sc);
+      });
+      sCard.appendChild(sg);
+    }
+    grid.appendChild(sCard);
+    inner.appendChild(grid);
+  }
+
+  wrap.appendChild(inner);
+  return wrap;
+}
+
+// ── Render ────────────────────────────────────────────
+function render(){
+  const app=document.getElementById("app");
+  app.innerHTML="";
+  let page;
+  if(state.page==="home")page=renderHome();
+  else if(state.page==="book")page=renderBook();
+  else if(state.page==="success")page=renderSuccess();
+  else if(state.page==="admin")page=renderAdmin();
+  else page=renderHome();
+  app.appendChild(page);
+  window.scrollTo(0,0);
+}
+
+render();
+</script>
+
+</body>
+</html>
