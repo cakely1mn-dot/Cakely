@@ -155,7 +155,12 @@ function startRealtimeSync(){
   onSnapshot(collection(db,"bookings"), snap => {
     S.bookings = snap.docs.map(d => ({...d.data(), _docId: d.id}))
       .sort((a,b) => (b.createdAt||"").localeCompare(a.createdAt||""));
-    render();
+    // Admin хуудсанд байвал зөвхөн table-г шинэчлэнэ
+    if(S.page === "admin" && S.adminAuthed) {
+      refreshAdminTable();
+    } else {
+      render();
+    }
   }, err => console.error("bookings sync error:", err));
   onSnapshot(collection(db,"holidays"), snap => {
     S.holidays = snap.docs
@@ -164,6 +169,20 @@ function startRealtimeSync(){
       .sort();
     render();
   }, err => console.error("holidays sync error:", err));
+}
+
+// Admin table-г бүтэн render хийлгүйгээр шинэчлэх
+function refreshAdminTable(){
+  var tableContainer = document.getElementById("admin-table-container");
+  if(!tableContainer) { render(); return; }
+  tableContainer.innerHTML = "";
+  tableContainer.appendChild(buildAdminTable());
+  // Stats шинэчлэх
+  var statsContainer = document.getElementById("admin-stats-container");
+  if(statsContainer){
+    statsContainer.innerHTML = "";
+    statsContainer.appendChild(buildAdminStats());
+  }
 }
 
 function slotUsed(date, time){
@@ -541,6 +560,111 @@ async function sendConfirmEmail(booking){
   }
 }
 
+// ── Admin helpers ────────────────────────────────
+function buildAdminStats(){
+  var stats = div({style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"14px",marginBottom:"28px"}});
+  [{label:"Нийт",val:S.bookings.length,color:"#6366f1"},{label:"Хүлээгдэж буй",val:S.bookings.filter(function(b){return b.status==="pending";}).length,color:"#f59e0b"},{label:"Баталгаажсан",val:S.bookings.filter(function(b){return b.status==="confirmed";}).length,color:"#10b981"},{label:"Цуцлагдсан",val:S.bookings.filter(function(b){return b.status==="cancelled";}).length,color:"#ef4444"}].forEach(function(s){
+    var c = div({style:{background:"#fff",borderRadius:"14px",padding:"18px 22px",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
+    c.appendChild(p({style:{fontSize:"30px",fontWeight:"700",color:s.color}}, s.val));
+    c.appendChild(p({style:{fontSize:"12px",color:"#888",marginTop:"2px"}}, s.label));
+    stats.appendChild(c);
+  });
+  return stats;
+}
+
+function buildAdminTable(){
+  var wrap = div({});
+
+  var filt = div({style:{display:"flex",gap:"7px",marginBottom:"16px",flexWrap:"wrap"}});
+  [["all","Бүгд"],["pending","Хүлээгдэж буй"],["confirmed","Баталгаажсан"],["cancelled","Цуцлагдсан"]].forEach(function(item){
+    filt.appendChild(btn({style:{background:S.adminFilter===item[0]?"#1a1a1a":"#fff",color:S.adminFilter===item[0]?"#fff":"#666",border:"1px solid #e8ddd5",borderRadius:"8px",padding:"7px 16px",fontSize:"13px",fontWeight:"500"}, onClick:function(){ S.adminFilter=item[0]; refreshAdminTable(); }}, item[1]));
+  });
+  wrap.appendChild(filt);
+
+  var filtered = S.adminFilter==="all" ? S.bookings : S.bookings.filter(function(b){ return b.status===S.adminFilter; });
+  var tableWrap = div({style:{background:"#fff",borderRadius:"18px",overflow:"hidden",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
+
+  if(filtered.length===0){
+    tableWrap.appendChild(div({style:{padding:"48px",textAlign:"center",color:"#bbb",fontSize:"14px"}}, "Захиалга байхгүй байна"));
+  } else {
+    var ow = div({style:{overflowX:"auto"}});
+    var tbl = el("table",{style:{width:"100%",borderCollapse:"collapse"}});
+    var thead = el("thead");
+    var hr = el("tr",{style:{background:"#fafafa",borderBottom:"1px solid #f0e6de"}});
+    ["#ID","Нэр","Утас","И-мэйл","Тоо","Өдөр","Цаг","Үнэ","Төлөв","Үйлдэл"].forEach(function(h){
+      var th = el("th",{style:{padding:"11px 14px",textAlign:"left",fontSize:"11px",fontWeight:"700",color:"#999",letterSpacing:"1px",textTransform:"uppercase",whiteSpace:"nowrap"}}, h);
+      hr.appendChild(th);
+    });
+    thead.appendChild(hr); tbl.appendChild(thead);
+    var tbody = el("tbody");
+    filtered.forEach(function(b,i){
+      var tr = el("tr",{style:{borderBottom:"1px solid #f8f8f8",background:i%2===0?"#fff":"#fafafa"}});
+      [
+        [("#"+b.id),""],
+        [b.name,"font-weight:600"],
+        [b.phone,""],
+        [b.email,"color:#777;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"],
+        [(b.qty||1)+"хүн","font-weight:600"],
+        [b.date,"font-weight:600"],
+        [b.time,""],
+        [fmt(b.price),"font-weight:700;color:#5b21b6"]
+      ].forEach(function(cell){
+        var td = el("td",{style:{padding:"11px 14px",fontSize:"13px"}}, String(cell[0]||""));
+        if(cell[1]) td.setAttribute("style","padding:11px 14px;font-size:13px;"+cell[1]);
+        tr.appendChild(td);
+      });
+      var std = el("td",{style:{padding:"11px 14px"}});
+      std.appendChild(span({style:{background:SC[b.status]+"22",color:SC[b.status],borderRadius:"100px",padding:"3px 10px",fontSize:"11px",fontWeight:"700",whiteSpace:"nowrap"}}, SL[b.status]));
+      tr.appendChild(std);
+      var atd = el("td",{style:{padding:"11px 14px"}});
+      var abx = div({style:{display:"flex",gap:"5px"}});
+      if(b.status==="pending"){
+        var cb = btn({style:{background:"#10b981",color:"#fff",border:"none",borderRadius:"7px",padding:"5px 10px",fontSize:"11px",fontWeight:"600",whiteSpace:"nowrap"}}, "✓ Баталгаажуулах");
+        (function(booking, button){
+          button.addEventListener("click", async function(){
+            if(!booking._docId){ alert("_docId олдсонгүй, refresh хийнэ үү."); return; }
+            button.textContent="⏳ Хадгалж байна..."; button.disabled=true; button.style.background="#6b7280";
+            try {
+              await DB.updateBooking(booking._docId, {status:"confirmed"});
+              button.textContent="⏳ Мэйл...";
+              var updatedBooking = Object.assign({}, booking, {status:"confirmed"});
+              await sendConfirmEmail(updatedBooking);
+            } catch(err) {
+              console.error("Confirm error:", err);
+              alert("Алдаа гарлаа: " + err.message);
+              button.textContent="✓ Баталгаажуулах"; button.disabled=false; button.style.background="#10b981";
+            }
+          });
+        })(b, cb);
+        abx.appendChild(cb);
+      }
+      if(b.status!=="cancelled"){
+        var xb = btn({style:{background:"#ef4444",color:"#fff",border:"none",borderRadius:"7px",padding:"5px 10px",fontSize:"11px",fontWeight:"600"}}, "✕ Цуцлах");
+        (function(booking, button){
+          button.addEventListener("click", async function(){
+            if(!confirm("Захиалгыг цуцлах уу?\n" + booking.name + " - " + booking.date + " " + booking.time)) return;
+            if(!booking._docId){ alert("_docId олдсонгүй, refresh хийнэ үү."); return; }
+            button.textContent="⏳"; button.disabled=true; button.style.background="#9ca3af";
+            try {
+              await DB.updateBooking(booking._docId, {status:"cancelled"});
+            } catch(err) {
+              console.error("Cancel error:", err);
+              alert("Алдаа гарлаа: " + err.message);
+              button.textContent="✕ Цуцлах"; button.disabled=false; button.style.background="#ef4444";
+            }
+          });
+        })(b, xb);
+        abx.appendChild(xb);
+      }
+      atd.appendChild(abx); tr.appendChild(atd);
+      tbody.appendChild(tr);
+    });
+    tbl.appendChild(tbody); ow.appendChild(tbl); tableWrap.appendChild(ow);
+  }
+  wrap.appendChild(tableWrap);
+  return wrap;
+}
+
 // ── Admin Page ───────────────────────────────────
 function AdminPage(){
   if(!S.adminAuthed) return AdminLoginPage();
@@ -562,102 +686,13 @@ function AdminPage(){
   var inner = div({style:{maxWidth:"1060px",margin:"0 auto",padding:"28px clamp(12px,3vw,28px)"}});
 
   if(S.adminTab==="bookings"){
-    var stats = div({style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:"14px",marginBottom:"28px"}});
-    [{label:"Нийт",val:S.bookings.length,color:"#6366f1"},{label:"Хүлээгдэж буй",val:S.bookings.filter(function(b){return b.status==="pending";}).length,color:"#f59e0b"},{label:"Баталгаажсан",val:S.bookings.filter(function(b){return b.status==="confirmed";}).length,color:"#10b981"},{label:"Цуцлагдсан",val:S.bookings.filter(function(b){return b.status==="cancelled";}).length,color:"#ef4444"}].forEach(function(s){
-      var c = div({style:{background:"#fff",borderRadius:"14px",padding:"18px 22px",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
-      c.appendChild(p({style:{fontSize:"30px",fontWeight:"700",color:s.color}}, s.val));
-      c.appendChild(p({style:{fontSize:"12px",color:"#888",marginTop:"2px"}}, s.label));
-      stats.appendChild(c);
-    });
-    inner.appendChild(stats);
+    var statsWrap = div({id:"admin-stats-container"});
+    statsWrap.appendChild(buildAdminStats());
+    inner.appendChild(statsWrap);
 
-    var filt = div({style:{display:"flex",gap:"7px",marginBottom:"16px",flexWrap:"wrap"}});
-    [["all","Бүгд"],["pending","Хүлээгдэж буй"],["confirmed","Баталгаажсан"],["cancelled","Цуцлагдсан"]].forEach(function(item){
-      filt.appendChild(btn({style:{background:S.adminFilter===item[0]?"#1a1a1a":"#fff",color:S.adminFilter===item[0]?"#fff":"#666",border:"1px solid #e8ddd5",borderRadius:"8px",padding:"7px 16px",fontSize:"13px",fontWeight:"500"}, onClick:function(){ setState({adminFilter:item[0]}); }}, item[1]));
-    });
-    inner.appendChild(filt);
-
-    var filtered = S.adminFilter==="all" ? S.bookings : S.bookings.filter(function(b){ return b.status===S.adminFilter; });
-    var tableWrap = div({style:{background:"#fff",borderRadius:"18px",overflow:"hidden",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
-
-    if(filtered.length===0){
-      tableWrap.appendChild(div({style:{padding:"48px",textAlign:"center",color:"#bbb",fontSize:"14px"}}, "Захиалга байхгүй байна"));
-    } else {
-      var ow = div({style:{overflowX:"auto"}});
-      var tbl = el("table",{style:{width:"100%",borderCollapse:"collapse"}});
-      var thead = el("thead");
-      var hr = el("tr",{style:{background:"#fafafa",borderBottom:"1px solid #f0e6de"}});
-      ["#ID","Нэр","Утас","И-мэйл","Тоо","Өдөр","Цаг","Үнэ","Төлөв","Үйлдэл"].forEach(function(h){
-        var th = el("th",{style:{padding:"11px 14px",textAlign:"left",fontSize:"11px",fontWeight:"700",color:"#999",letterSpacing:"1px",textTransform:"uppercase",whiteSpace:"nowrap"}}, h);
-        hr.appendChild(th);
-      });
-      thead.appendChild(hr); tbl.appendChild(thead);
-      var tbody = el("tbody");
-      filtered.forEach(function(b,i){
-        var tr = el("tr",{style:{borderBottom:"1px solid #f8f8f8",background:i%2===0?"#fff":"#fafafa"}});
-        [
-          [("#"+b.id),"font-size:11px;font-weight:700;color:#bbb"],
-          [b.name,"font-size:13px;font-weight:600"],
-          [b.phone,"font-size:13px"],
-          [b.email,"font-size:12px;color:#777;max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"],
-          [(b.qty||1)+"хүн","font-size:13px;font-weight:600"],
-          [b.date,"font-size:13px;font-weight:600"],
-          [b.time,"font-size:13px"],
-          [fmt(b.price),"font-size:13px;font-weight:700;color:#5b21b6"]
-        ].forEach(function(cell){
-          var td = el("td",{style:{padding:"11px 14px"}}, String(cell[0]||""));
-          tr.appendChild(td);
-        });
-        var std = el("td",{style:{padding:"11px 14px"}});
-        std.appendChild(span({style:{background:SC[b.status]+"22",color:SC[b.status],borderRadius:"100px",padding:"3px 10px",fontSize:"11px",fontWeight:"700",whiteSpace:"nowrap"}}, SL[b.status]));
-        tr.appendChild(std);
-        var atd = el("td",{style:{padding:"11px 14px"}});
-        var abx = div({style:{display:"flex",gap:"5px"}});
-        if(b.status==="pending"){
-          var cb = btn({style:{background:"#10b981",color:"#fff",border:"none",borderRadius:"7px",padding:"5px 10px",fontSize:"11px",fontWeight:"600",whiteSpace:"nowrap"}}, "✓ Баталгаажуулах");
-          (function(booking, button){
-            button.addEventListener("click", async function(){
-              if(!booking._docId){ alert("_docId олдсонгүй, refresh хийнэ үү."); return; }
-              button.textContent="⏳ Хадгалж байна..."; button.disabled=true; button.style.background="#6b7280";
-              try {
-                await DB.updateBooking(booking._docId, {status:"confirmed"});
-                // onSnapshot-аар S.bookings шинэчлэгдэнэ, тиймээс updated booking-г S.bookings-с авна
-                button.textContent="⏳ Мэйл...";
-                var updatedBooking = Object.assign({}, booking, {status:"confirmed"});
-                await sendConfirmEmail(updatedBooking);
-              } catch(err) {
-                console.error("Confirm error:", err);
-                alert("Алдаа гарлаа: " + err.message);
-                button.textContent="✓ Баталгаажуулах"; button.disabled=false; button.style.background="#10b981";
-              }
-            });
-          })(b, cb);
-          abx.appendChild(cb);
-        }
-        if(b.status!=="cancelled"){
-          var xb = btn({style:{background:"#ef4444",color:"#fff",border:"none",borderRadius:"7px",padding:"5px 10px",fontSize:"11px",fontWeight:"600"}}, "✕ Цуцлах");
-          (function(booking, button){
-            button.addEventListener("click", async function(){
-              if(!confirm("Захиалгыг цуцлах уу?\n" + booking.name + " - " + booking.date + " " + booking.time)) return;
-              if(!booking._docId){ alert("_docId олдсонгүй, refresh хийнэ үү."); return; }
-              button.textContent="⏳"; button.disabled=true; button.style.background="#9ca3af";
-              try {
-                await DB.updateBooking(booking._docId, {status:"cancelled"});
-              } catch(err) {
-                console.error("Cancel error:", err);
-                alert("Алдаа гарлаа: " + err.message);
-                button.textContent="✕ Цуцлах"; button.disabled=false; button.style.background="#ef4444";
-              }
-            });
-          })(b, xb);
-          abx.appendChild(xb);
-        }
-        atd.appendChild(abx); tr.appendChild(atd);
-        tbody.appendChild(tr);
-      });
-      tbl.appendChild(tbody); ow.appendChild(tbl); tableWrap.appendChild(ow);
-    }
-    inner.appendChild(tableWrap);
+    var tableWrap2 = div({id:"admin-table-container"});
+    tableWrap2.appendChild(buildAdminTable());
+    inner.appendChild(tableWrap2);
   }
 
   else if(S.adminTab==="calendar"){
