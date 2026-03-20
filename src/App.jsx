@@ -7,7 +7,7 @@ const STUDIO_ADDRESS = "11-р хороолол, Diamond Entertainment Lounge-ы�
 const BANK_NAME = "Хаан банк";
 const BANK_ACCOUNT = "290005005070318300";
 const ADMIN_EMAIL = "cakely1.mn@gmail.com";
-const ADMIN_PASS = "Cakely@2024";
+const ADMIN_PASS = "Cakely@2026";
 const TIME_SLOTS = ["10:00", "12:00", "14:00", "16:00", "18:00", "20:00"];
 const MAX_SLOT = 6;
 
