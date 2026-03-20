@@ -152,8 +152,8 @@ function renderHome(){
   const hero=div({style:{minHeight:"88vh",display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",textAlign:"center",padding:"60px 24px",background:"linear-gradient(150deg,#fff5f0 0%,#fdf0fa 55%,#f0eeff 100%)",position:"relative",overflow:"hidden"}});
   const badge=div({className:"f1",style:{display:"inline-flex",alignItems:"center",gap:"8px",background:"rgba(255,255,255,.75)",border:"1px solid #f0e6de",borderRadius:"100px",padding:"6px 20px",fontSize:"11px",fontWeight:"700",letterSpacing:"2.5px",textTransform:"uppercase",color:"#c084a8",marginBottom:"28px"}},"🍰 Бялуу чимэглэлийн студио");
   const title=h("h1",{className:"serif f2",style:{fontSize:"clamp(40px,8vw,84px)",fontWeight:"300",lineHeight:"1.1",color:"#1a1a1a",marginBottom:"18px"}});
-  title.innerHTML="Өөрийн гараар<br><em style='color:#c084a8'>бялуугаа чимэглэ</em>";
-  const sub=p({className:"f3",style:{fontSize:"16px",color:"#666",maxWidth:"460px",lineHeight:"1.75",marginBottom:"44px"}},"Найзтайгаа эсвэл хосоороо ирж, мэргэжлийн зааврын дор өөрийн гэсэн хэв маягтай бялуу чимэглэж сур.");
+  title.innerHTML="Decorate your<br><em style='color:#c084a8'>own cake</em>";
+  const sub=p({className:"f3",style:{fontSize:"16px",color:"#666",maxWidth:"460px",lineHeight:"1.75",marginBottom:"44px"}},"Дотны хүмүүстэйгээ дулаахан цагийг өнгөрүүлээрэй.");
   const cta=btn({className:"f4",style:{background:"#1a1a1a",color:"#fff",border:"none",borderRadius:"13px",padding:"14px 36px",fontSize:"15px",fontWeight:"600",boxShadow:"0 6px 24px rgba(0,0,0,.16)"},onClick:()=>setState({page:"book"})},"Цаг захиалах →");
   hero.appendChild(badge);hero.appendChild(title);hero.appendChild(sub);hero.appendChild(cta);
   wrap.appendChild(hero);
@@ -162,7 +162,7 @@ function renderHome(){
   const pkgSec=div({style:{padding:"80px clamp(16px,5vw,60px)",background:"#fff"}});
   const pkgHead=div({style:{textAlign:"center",marginBottom:"52px"}});
   pkgHead.appendChild(p({style:{fontSize:"10px",fontWeight:"700",letterSpacing:"2.5px",textTransform:"uppercase",color:"#c084a8",marginBottom:"10px"}},"БАГЦУУД"));
-  pkgHead.appendChild(h("h2",{className:"serif",style:{fontSize:"42px",fontWeight:"400"}},"Өөрт тохирохоо сонго"));
+  pkgHead.appendChild(h("h2",{className:"serif",style:{fontSize:"42px",fontWeight:"400"}},"<3"));
   pkgSec.appendChild(pkgHead);
   const grid=div({style:{maxWidth:"860px",margin:"0 auto",display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(290px,1fr))",gap:"24px"}});
   PKGS.forEach(p_=>{
@@ -289,8 +289,8 @@ function renderBook(){
     const sb=btn({style:{width:"100%",background:"#c084a8",color:"#fff",border:"none",borderRadius:"12px",padding:"15px 0",fontWeight:"700",fontSize:"15px",boxShadow:"0 4px 18px rgba(192,132,168,.38)"},onClick:()=>{
       const e={};
       if(!state.form.name.trim())e.name="Нэр оруулна уу";
-      if(!/^\d{8}$/.test(state.form.phone.replace(/\s/g,"")))e.phone="8 оронтой утасны дугаар";
-      if(!state.form.email.includes("@"))e.email="Зөв и-мэйл оруулна уу";
+      if(!/^\d{8}$/.test(state.form.phone.replace(/\s/g,"")))e.phone="Утасны дугаар";
+      if(!state.form.email.includes("@"))e.email="Мэйл оруулна уу";
       if(Object.keys(e).length){setState({errors:e});return;}
       const b={...state.form,date:state.selDate,time:state.selTime,package:state.selPkg.id,packageName:state.selPkg.name,price:state.selPkg.price,id:uid(),status:"pending",createdAt:new Date().toISOString()};
       const nb=[...state.bookings,b];
@@ -337,7 +337,7 @@ function renderAdminLogin(){
   card.innerHTML=`<div style="text-align:center;margin-bottom:32px"><div style="font-size:40px;margin-bottom:8px">🎂</div><h1 class="serif" style="font-size:26px;font-weight:600">Cakely Studio</h1><p style="font-size:13px;color:#aaa;margin-top:4px">Админ удирдлагын систем</p></div><div style="height:1px;background:#f0e6de;margin-bottom:28px"></div>`;
   const emailW=div({style:{marginBottom:"16px"}});
   emailW.appendChild(h("label",{style:{display:"block",marginBottom:"7px",fontSize:"13px",fontWeight:"600",color:"#555"}},"И-мэйл хаяг"));
-  const ei=inp({type:"email",placeholder:"admin@cakelystudio.mn",id:"adminEmail"});
+  const ei=inp({type:"email",placeholder:"cakely1.mn@gmail.com",id:"adminEmail"});
   emailW.appendChild(ei);
   card.appendChild(emailW);
   const pwW=div({style:{marginBottom:"20px",position:"relative"}});
