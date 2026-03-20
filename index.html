@@ -222,7 +222,7 @@ function renderBook(){
 
   if(state.bookStep===1){
     inner.appendChild(h("h2",{className:"serif f1",style:{fontSize:"34px",marginBottom:"8px"}},"Багц сонгоно уу"));
-    inner.appendChild(p({style:{color:"#888",marginBottom:"28px",fontSize:"14px"}},"Танд тохирох багцаа сонгоно уу"));
+    inner.appendChild(p({style:{color:"#888",marginBottom:"28px",fontSize:"14px"}},"Багцууд"));
     const list=div({style:{display:"flex",flexDirection:"column",gap:"14px"}});
     PKGS.forEach(pk=>{
       const card=btn({style:{border:"2px solid "+(state.selPkg?.id===pk.id?pk.dark:pk.border),borderRadius:"18px",padding:"22px 26px",background:state.selPkg?.id===pk.id?pk.light:"#fff",display:"flex",alignItems:"center",gap:"18px",transition:"all .18s",textAlign:"left",width:"100%"}});
