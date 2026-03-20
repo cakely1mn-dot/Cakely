@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-,::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'DM Sans',sans-serif;background:#fffaf7;color:#1a1a1a;}
 .serif{font-family:'Cormorant Garamond',serif;}
 input,select,textarea{font-family:'DM Sans',sans-serif;outline:none;border:1.5px solid #e8ddd5;border-radius:10px;padding:11px 15px;font-size:14px;background:#fff;width:100%;transition:border-color .2s,box-shadow .2s;}
@@ -73,7 +73,7 @@ let state={
   selTime:"",
   form:{name:"",phone:"",email:""},
   errors:{},
-  adminAuthed:false,
+  adminAuthed:localStorage.getItem('ck:auth')==='1',
   adminTab:"bookings",
   adminFilter:"all",
   newHoliday:"",
@@ -294,6 +294,7 @@ function renderBook(){
       if(Object.keys(e).length){setState({errors:e});return;}
       const b={...state.form,date:state.selDate,time:state.selTime,package:state.selPkg.id,packageName:state.selPkg.name,price:state.selPkg.price,id:uid(),status:"pending",createdAt:new Date().toISOString()};
       const nb=[...state.bookings,b];
+      state.bookings=nb;
       DB.saveBookings(nb);
       setState({bookings:nb,lastBook:b,page:"success",bookStep:1,form:{name:"",phone:"",email:""},errors:{},selPkg:null,selTime:""});
     }},"Захиалга илгээх 🎂");
@@ -349,7 +350,7 @@ function renderAdminLogin(){
   card.appendChild(errDiv);
   const lb=btn({style:{width:"100%",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:"12px",padding:"14px 0",fontWeight:"600",fontSize:"15px"},onClick:()=>{
     const e=ei.value.trim().toLowerCase(),pw=pi.value;
-    if(e===ADMIN_EMAIL&&pw===ADMIN_PASS){setState({adminAuthed:true});}
+    if(e===ADMIN_EMAIL&&pw===ADMIN_PASS){localStorage.setItem('ck:auth','1');setState({adminAuthed:true});}
     else{errDiv.style.display="block";errDiv.textContent="⚠️ И-мэйл эсвэл нууц үг буруу байна.";}
   }},"Нэвтрэх");
   card.appendChild(lb);
@@ -370,7 +371,7 @@ function renderAdmin(){
   [["bookings","📋 Захиалгууд"],["calendar","📅 Хуваарь"]].forEach(([k,l])=>{
     right.appendChild(btn({style:{background:state.adminTab===k?"rgba(255,255,255,.15)":"none",border:"none",color:state.adminTab===k?"#fff":"#999",borderRadius:"8px",padding:"6px 14px",fontSize:"13px",fontWeight:"500"},onClick:()=>setState({adminTab:k})},l));
   });
-  right.appendChild(btn({style:{background:"none",border:"1px solid #444",color:"#888",borderRadius:"8px",padding:"5px 12px",fontSize:"12px",marginLeft:"8px"},onClick:()=>setState({adminAuthed:false})},"Гарах"));
+  right.appendChild(btn({style:{background:"none",border:"1px solid #444",color:"#888",borderRadius:"8px",padding:"5px 12px",fontSize:"12px",marginLeft:"8px"},onClick:()=>{localStorage.removeItem('ck:auth');setState({adminAuthed:false});}},"Гарах"));
   topBar.appendChild(left);topBar.appendChild(right);
   wrap.appendChild(topBar);
 
