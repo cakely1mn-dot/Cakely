@@ -45,7 +45,7 @@ footer{background:#1a1a1a;color:#888;text-align:center;padding:30px 24px;font-si
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
   getFirestore, collection, doc,
-  getDocs, addDoc, updateDoc, onSnapshot
+  getDocs, addDoc, updateDoc, deleteDoc, onSnapshot
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // ── Firebase Config ──────────────────────────────
@@ -121,8 +121,8 @@ var DB = {
     try {
       const snap = await getDocs(collection(db,"holidays"));
       const target = snap.docs.find(d => d.data().date === date);
-      if(target) await updateDoc(doc(db,"holidays",target.id), {date:"__deleted__"});
-    } catch(e){ console.error(e); }
+      if(target) await deleteDoc(doc(db,"holidays",target.id));
+    } catch(e){ console.error("removeHoliday error:", e); }
   }
 };
 
@@ -165,7 +165,7 @@ function startRealtimeSync(){
   onSnapshot(collection(db,"holidays"), snap => {
     S.holidays = snap.docs
       .map(d => d.data().date)
-      .filter(d => d && d !== "__deleted__")
+      .filter(Boolean)
       .sort();
     render();
   }, err => console.error("holidays sync error:", err));
