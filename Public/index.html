@@ -434,7 +434,9 @@ function BookPage(){
     inner.appendChild(payBox);
 
     // Instruction
-    inner.appendChild(div({style:{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:"12px",padding:"14px 18px",marginBottom:"24px",fontSize:"13px",color:"#166534",lineHeight:"1.8"}},{html:"✅ <strong>Төлбөр хийсний дараа</strong> \"Төлбөр төлсөн\" товчийг дарна уу.<br>Манай админ дансаа шалгасны дараа захиалгыг баталгаажуулах бөгөөд <strong>"+S.form.email+"</strong> хаяг руу мэдэгдэл илгээнэ."}));
+    var instrBox=div({style:{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:"12px",padding:"14px 18px",marginBottom:"24px",fontSize:"13px",color:"#166534",lineHeight:"1.8"}});
+    instrBox.innerHTML="✅ <strong>Төлбөр хийсний дараа</strong> \"Төлбөр төлсөн\" товчийг дарна уу.<br>Манай админ дансаа шалгасны дараа захиалгыг баталгаажуулах бөгөөд <strong>"+S.form.email+"</strong> хаяг руу мэдэгдэл илгээнэ.";
+    inner.appendChild(instrBox);
 
     var confirmBtn=btn({style:{width:"100%",background:S.loading?"#bbb":"#10b981",color:"#fff",border:"none",borderRadius:"12px",padding:"15px 0",fontWeight:"700",fontSize:"15px",boxShadow:"0 4px 18px rgba(16,185,129,.3)"}},S.loading?"Хадгалж байна...":"✓ Төлбөр төлсөн — Захиалга илгээх");
     confirmBtn.disabled=S.loading;
@@ -471,7 +473,9 @@ function SuccessPage(){
   card.appendChild(subP);
 
   // Status note
-  card.appendChild(div({style:{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:"12px",padding:"14px 18px",marginBottom:"20px",fontSize:"13px",color:"#92400e",textAlign:"left"}},{html:"⏳ <strong>Одоогийн төлөв:</strong> Хүлээгдэж буй<br><span style='color:#b45309'>Төлбөр баталгаажсаны дараа и-мэйлээр мэдэгдэнэ.</span>"}));
+  var statusBox=div({style:{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:"12px",padding:"14px 18px",marginBottom:"20px",fontSize:"13px",color:"#92400e",textAlign:"left"}});
+  statusBox.innerHTML="⏳ <strong>Одоогийн төлөв:</strong> Хүлээгдэж буй<br><span style='color:#b45309'>Төлбөр баталгаажсаны дараа и-мэйлээр мэдэгдэнэ.</span>";
+  card.appendChild(statusBox);
 
   var detBox=div({style:{background:"#fdf4ff",border:"1px dashed #e9d5ff",borderRadius:"14px",padding:"18px",marginBottom:"20px",textAlign:"left"}});
   [["Багц",b.packageName],["Хүний тоо",b.qty+"хүн"],["Өдөр",b.date],["Цаг",b.time],["Нэр",b.name],["Утас",b.phone],["Нийт үнэ",fmt(b.price)]].forEach(row=>{
