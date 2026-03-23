@@ -62,7 +62,7 @@ const app = initializeApp(firebaseConfig);
 const db  = getFirestore(app);
 const auth = getAuth(app);
 
-// ── Config (non-secret info only) ───────────────
+// ── Config ───────────────────────────────────────
 var PHONE   = "90301779";
 var ADDRESS = "11-р хороолол, Diamond Entertainment Lounge-ын хойд хаалга";
 var BANK    = "Хаан банк";
@@ -75,7 +75,7 @@ var PKG = {
   items:["Бялууны кекс 1 ширхэг","Крем + чимэглэл","Уух зүйл 1 ширхэг","Заавар зөвлөгөө"]
 };
 var SC = {pending:"#f59e0b", confirmed:"#10b981", cancelled:"#ef4444"};
-var SL = {pending:"Хүлээгдэж буй", confirmed:"Баталгаажсан",  cancelled:"Цуцлагдсан"};
+var SL = {pending:"Хүлээгдэж буй", confirmed:"Баталгаажсан", cancelled:"Цуцлагдсан"};
 
 function fmt(n){ return (n||0).toLocaleString()+"₮"; }
 function uid(){ return Date.now().toString(36).toUpperCase()+Math.random().toString(36).slice(2,5).toUpperCase(); }
@@ -94,7 +94,7 @@ var DB = {
     try{
       const ref = await addDoc(collection(db,"bookings"),b);
       return {...b,_docId:ref.id};
-    }catch(e){ console.error(e); return b; }
+    }catch(e){ console.error("addBooking error:",e); throw e; }
   },
   async updateBooking(docId,patch){
     try{
@@ -132,13 +132,13 @@ var S = {
   qty:1,
   form:{name:"",phone:"",email:""},
   errors:{},
-  // Admin auth via Firebase Auth — no password in code
   adminAuthed:false,
   adminUser:null,
   adminTab:"bookings",
   adminFilter:"all",
   schedDate:today(),
-  loading:false
+  loading:false,
+  bookingsSynced:false  // realtime sync эхэлсэн эсэх
 };
 
 function setState(patch){ Object.assign(S,patch); render(); }
@@ -148,23 +148,31 @@ onAuthStateChanged(auth, user => {
   if(user){
     S.adminAuthed = true;
     S.adminUser   = user;
+    // Нэвтэрсэн үед л bookings realtime sync эхлүүлнэ
+    if(!S.bookingsSynced){
+      S.bookingsSynced = true;
+      startBookingsSync();
+    }
   } else {
     S.adminAuthed = false;
     S.adminUser   = null;
   }
-  // Only re-render if on admin page
   if(S.page === "admin") render();
 });
 
 // ── Realtime sync ────────────────────────────────
-function startRealtimeSync(){
+// Bookings: зөвхөн admin нэвтэрсэн үед
+function startBookingsSync(){
   onSnapshot(collection(db,"bookings"), snap => {
     S.bookings = snap.docs.map(d=>({...d.data(),_docId:d.id}))
       .sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||""));
     if(S.page==="admin" && S.adminAuthed) refreshAdminTable();
     else render();
   }, err=>console.error("bookings sync:",err));
+}
 
+// Holidays: нийтэд нээлттэй тул init-ээс эхлүүлнэ
+function startHolidaysSync(){
   onSnapshot(collection(db,"holidays"), snap => {
     S.holidays = snap.docs.map(d=>d.data().date).filter(Boolean).sort();
     render();
@@ -286,7 +294,6 @@ function BookPage(){
   wrap.appendChild(Nav("book"));
   var inner=div({style:{maxWidth:"580px",margin:"0 auto",padding:"48px clamp(16px,4vw,32px)"}});
 
-  // 4-step stepper: Багц → Цаг → Мэдээлэл → Төлбөр
   var stepLabels=["Багц","Цаг","Мэдээлэл","Төлбөр"];
   var stepper=div({style:{display:"flex",alignItems:"center",marginBottom:"46px"}});
   stepLabels.forEach((s,i)=>{
@@ -298,7 +305,7 @@ function BookPage(){
 
   var isHoliday=S.holidays.indexOf(S.date)>=0;
 
-  // ── Step 1: Package ──
+  // ── Step 1 ──
   if(S.step===1){
     inner.appendChild(h2({className:"serif f1",style:{fontSize:"34px",marginBottom:"8px"}},"Багц сонгоно уу"));
     inner.appendChild(p({style:{color:"#888",marginBottom:"28px",fontSize:"14px"}},"Захиалахын тулд багцаа сонгоно уу"));
@@ -312,7 +319,7 @@ function BookPage(){
     ]));
   }
 
-  // ── Step 2: Date & Time ──
+  // ── Step 2 ──
   else if(S.step===2){
     inner.appendChild(btn({style:{background:"none",border:"none",color:"#999",fontSize:"13px",marginBottom:"22px",display:"flex",alignItems:"center",gap:"5px"},onClick:()=>setState({step:1})},"← Буцах"));
     inner.appendChild(h2({className:"serif f1",style:{fontSize:"34px",marginBottom:"8px"}},"Өдөр, цаг сонгоно уу"));
@@ -343,7 +350,7 @@ function BookPage(){
     }
   }
 
-  // ── Step 3: Info ──
+  // ── Step 3 ──
   else if(S.step===3){
     inner.appendChild(btn({style:{background:"none",border:"none",color:"#999",fontSize:"13px",marginBottom:"22px",display:"flex",alignItems:"center",gap:"5px"},onClick:()=>setState({step:2})},"← Буцах"));
     inner.appendChild(h2({className:"serif f1",style:{fontSize:"34px",marginBottom:"8px"}},"Мэдээлэл оруулна уу"));
@@ -399,13 +406,12 @@ function BookPage(){
     inner.appendChild(sb);
   }
 
-  // ── Step 4: Payment ──
+  // ── Step 4 ──
   else if(S.step===4){
     inner.appendChild(btn({style:{background:"none",border:"none",color:"#999",fontSize:"13px",marginBottom:"22px",display:"flex",alignItems:"center",gap:"5px"},onClick:()=>setState({step:3})},"← Буцах"));
     inner.appendChild(h2({className:"serif f1",style:{fontSize:"34px",marginBottom:"8px"}},"Төлбөр төлөх"));
     inner.appendChild(p({style:{color:"#888",marginBottom:"28px",fontSize:"14px"}},"Доорх дансанд шилжүүлэн төлбөрөө хийнэ үү"));
 
-    // Payment info box
     var payBox=div({style:{background:"#fff7ed",border:"2px solid #fed7aa",borderRadius:"18px",padding:"24px",marginBottom:"20px"}});
     payBox.appendChild(p({style:{fontSize:"13px",fontWeight:"700",color:"#c2410c",marginBottom:"16px",letterSpacing:"1px"}},"💳 ТӨЛБӨРИЙН МЭДЭЭЛЭЛ"));
     [["Банк",BANK],["Дансны дугаар",ACCOUNT],["Гүйлгээний утга",S.form.phone],["Төлөх дүн",fmt(PKG.price*S.qty)]].forEach(row=>{
@@ -413,7 +419,6 @@ function BookPage(){
       r.appendChild(span({style:{fontSize:"13px",color:"#92400e"}},row[0]));
       var valWrap=div({style:{display:"flex",alignItems:"center",gap:"8px"}});
       valWrap.appendChild(span({style:{fontSize:"13px",fontWeight:"700",color:"#1a1a1a"}},row[1]));
-      // Copy button for account and amount
       if(row[0]==="Дансны дугаар"||row[0]==="Төлөх дүн"){
         var cpBtn=btn({style:{background:"#f0e6de",border:"none",borderRadius:"6px",padding:"3px 8px",fontSize:"11px",color:"#92400e",fontWeight:"600"}},"Хуулах");
         (function(val,b){
@@ -428,12 +433,8 @@ function BookPage(){
       r.appendChild(valWrap);
       payBox.appendChild(r);
     });
-    // Remove last border
-    var rows=payBox.querySelectorAll("div");
-    if(rows.length>0) rows[rows.length-1].style.borderBottom="none";
     inner.appendChild(payBox);
 
-    // Instruction
     var instrBox=div({style:{background:"#f0fdf4",border:"1px solid #86efac",borderRadius:"12px",padding:"14px 18px",marginBottom:"24px",fontSize:"13px",color:"#166534",lineHeight:"1.8"}});
     instrBox.innerHTML="✅ <strong>Төлбөр хийсний дараа</strong> \"Төлбөр төлсөн\" товчийг дарна уу.<br>Манай админ дансаа шалгасны дараа захиалгыг баталгаажуулах бөгөөд <strong>"+S.form.email+"</strong> хаяг руу мэдэгдэл илгээнэ.";
     inner.appendChild(instrBox);
@@ -449,8 +450,13 @@ function BookPage(){
         price:PKG.price*S.qty,
         id:uid(), status:"pending", createdAt:new Date().toISOString()
       };
-      var saved=await DB.addBooking(b);
-      setState({lastBook:saved, page:"success", step:1, form:{name:"",phone:"",email:""}, errors:{}, time:"", qty:1, loading:false});
+      try{
+        var saved=await DB.addBooking(b);
+        setState({lastBook:saved, page:"success", step:1, form:{name:"",phone:"",email:""}, errors:{}, time:"", qty:1, loading:false});
+      }catch(e){
+        alert("Захиалга хадгалахад алдаа гарлаа. Дахин оролдоно уу.\n"+e.message);
+        setState({loading:false});
+      }
     });
     inner.appendChild(confirmBtn);
     inner.appendChild(p({style:{textAlign:"center",fontSize:"12px",color:"#bbb",marginTop:"12px"}},"Захиалга \"Хүлээгдэж буй\" төлөвт орно. Төлбөр баталгаажсаны дараа баталгаажна."));
@@ -472,7 +478,6 @@ function SuccessPage(){
   subP.innerHTML="Захиалгын дугаар: <strong style='color:#1a1a1a'>#"+b.id+"</strong><br>Таны захиалга баталгаажсан мэйл <strong>"+b.email+"</strong> хаяг руу тун удахгүй илгээгдэнэ.";
   card.appendChild(subP);
 
-  // Status note
   var statusBox=div({style:{background:"#fef3c7",border:"1px solid #fde68a",borderRadius:"12px",padding:"14px 18px",marginBottom:"20px",fontSize:"13px",color:"#92400e",textAlign:"left"}});
   statusBox.innerHTML="⏳ <strong>Одоогийн төлөв:</strong> Хүлээгдэж буй<br><span style='color:#b45309'>Төлбөр баталгаажсаны дараа и-мэйлээр мэдэгдэнэ.</span>";
   card.appendChild(statusBox);
@@ -490,7 +495,7 @@ function SuccessPage(){
   return wrap;
 }
 
-// ── Admin Login (Firebase Auth) ──────────────────
+// ── Admin Login ───────────────────────────────────
 function AdminLoginPage(){
   var wrap=div({style:{minHeight:"100vh",background:"linear-gradient(135deg,#1a1a1a,#2d1b2e)",display:"flex",alignItems:"center",justifyContent:"center",padding:"24px"}});
   var card=div({style:{background:"#fff",borderRadius:"28px",padding:"48px 40px",width:"100%",maxWidth:"400px",boxShadow:"0 32px 80px rgba(0,0,0,.35)"}});
@@ -521,24 +526,20 @@ function AdminLoginPage(){
     lb.textContent="⏳ Нэвтэрч байна..."; lb.disabled=true;
     try{
       await signInWithEmailAndPassword(auth, eInp.value.trim(), pInp.value);
-      // onAuthStateChanged listener handles the rest
     } catch(err){
       errDiv.style.display="block";
       errDiv.textContent="⚠️ И-мэйл эсвэл нууц үг буруу байна.";
       lb.textContent="Нэвтрэх"; lb.disabled=false;
     }
   });
-
-  // Allow Enter key
   pInp.addEventListener("keydown",e=>{ if(e.key==="Enter") lb.click(); });
-
   card.appendChild(lb);
   card.appendChild(btn({style:{display:"block",margin:"16px auto 0",background:"none",border:"none",color:"#bbb",fontSize:"13px"},onClick:()=>setState({page:"home"})},"← Нүүр хуудасруу буцах"));
   wrap.appendChild(card);
   return wrap;
 }
 
-// ── Email modal ──────────────────────────────────
+// ── Email modal ───────────────────────────────────
 function showEmailModal(booking,emailText){
   var overlay=div({className:"modal-overlay"});
   var modal=div({style:{background:"#fff",borderRadius:"20px",padding:"28px",maxWidth:"500px",width:"100%",maxHeight:"80vh",overflowY:"auto",boxShadow:"0 20px 60px rgba(0,0,0,.3)"}});
@@ -695,7 +696,7 @@ function AdminPage(){
   });
   right.appendChild(btn({style:{background:"none",border:"1px solid #444",color:"#888",borderRadius:"8px",padding:"5px 12px",fontSize:"12px",marginLeft:"8px"},onClick:async ()=>{
     await signOut(auth);
-    setState({adminAuthed:false, adminUser:null});
+    setState({adminAuthed:false, adminUser:null, bookingsSynced:false});
   }},"Гарах"));
   topBar.appendChild(left); topBar.appendChild(right);
   wrap.appendChild(topBar);
@@ -787,12 +788,14 @@ function render(){
 
 // ── Init ─────────────────────────────────────────
 async function init(){
-  const [bookings,holidays]=await Promise.all([DB.loadBookings(),DB.loadHolidays()]);
-  S.bookings=bookings;
-  S.holidays=holidays;
+  // Holidays нийтэд нээлттэй тул шууд ачаална
+  const holidays = await DB.loadHolidays();
+  S.holidays = holidays;
   document.getElementById("loading-screen").style.display="none";
   document.getElementById("app").style.display="block";
-  startRealtimeSync();
+  // Holidays realtime sync эхлүүлнэ (нийтэд нээлттэй)
+  startHolidaysSync();
+  // Bookings-ийг зөвхөн onAuthStateChanged дотор нэвтэрсэн үед ачаална
   render();
 }
 
