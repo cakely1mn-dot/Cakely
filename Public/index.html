@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-,::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'DM Sans',sans-serif;background:#fffaf7;color:#1a1a1a;}
 .serif{font-family:'Cormorant Garamond',serif;}
 input,select{font-family:'DM Sans',sans-serif;outline:none;border:1.5px solid #e8ddd5;border-radius:10px;padding:11px 15px;font-size:14px;background:#fff;width:100%;transition:border-color .2s,box-shadow .2s;}
@@ -109,13 +109,14 @@ var DB = {
     }catch(e){ console.error(e); return []; }
   },
   async addHoliday(date){
-    try{ await addDoc(collection(db,"holidays"),{date}); }catch(e){ console.error(e); }
+    try{ await addDoc(collection(db,"holidays"),{date}); await refreshHolidays(); }catch(e){ console.error(e); }
   },
   async removeHoliday(date){
     try{
       const snap = await getDocs(collection(db,"holidays"));
       const t = snap.docs.find(d=>d.data().date===date);
       if(t) await deleteDoc(doc(db,"holidays",t.id));
+      await refreshHolidays();
     }catch(e){ console.error(e); }
   }
 };
@@ -171,12 +172,13 @@ function startBookingsSync(){
   }, err=>console.error("bookings sync:",err));
 }
 
-// Holidays: нийтэд нээлттэй тул init-ээс эхлүүлнэ
-function startHolidaysSync(){
-  onSnapshot(collection(db,"holidays"), snap => {
+// Holidays: onSnapshot биш getDocs ашиглана (permission асуудлаас зайлсхийх)
+async function refreshHolidays(){
+  try{
+    const snap = await getDocs(collection(db,"holidays"));
     S.holidays = snap.docs.map(d=>d.data().date).filter(Boolean).sort();
     render();
-  }, err=>console.error("holidays sync:",err));
+  }catch(e){ console.error("holidays load:",e); }
 }
 
 function refreshAdminTable(){
@@ -788,14 +790,9 @@ function render(){
 
 // ── Init ─────────────────────────────────────────
 async function init(){
-  // Holidays нийтэд нээлттэй тул шууд ачаална
-  const holidays = await DB.loadHolidays();
-  S.holidays = holidays;
+  await refreshHolidays();
   document.getElementById("loading-screen").style.display="none";
   document.getElementById("app").style.display="block";
-  // Holidays realtime sync эхлүүлнэ (нийтэд нээлттэй)
-  startHolidaysSync();
-  // Bookings-ийг зөвхөн onAuthStateChanged дотор нэвтэрсэн үед ачаална
   render();
 }
 
