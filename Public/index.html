@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="mn">
 <head>
 <meta charset="UTF-8"/>
@@ -146,7 +145,6 @@ const DB = {
 };
 
 // ── State ────────────────────────────────────────
-// Immutable-style: шууд мутаци хийхгүй, setState() ашиглана
 const S = {
   page:"home",
   bookings:[],
@@ -168,10 +166,34 @@ const S = {
 };
 
 function setState(patch){
-  // form-ийн дотоод талбаруудыг merge хийнэ
   if(patch.form) patch.form = {...S.form, ...patch.form};
   Object.assign(S, patch);
   render();
+}
+
+// ── Realtime sync (бүх хэрэглэгчдэд ажиллана) ─────────────────
+let unsubscribeBookings = null;
+
+function startBookingsSync(){
+  if(unsubscribeBookings){
+    unsubscribeBookings();
+    unsubscribeBookings = null;
+  }
+  
+  onSnapshot(collection(db,"bookings"), snap => {
+    S.bookings = snap.docs
+      .map(d=>({...d.data(), _docId:d.id}))
+      .sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||""));
+    
+    // Захиалга шинэчлэгдсэн үед UI-г refresh хийх
+    if(S.page === "book"){
+      render();
+    } else if(S.page === "admin" && S.adminAuthed){
+      refreshAdminTable();
+    } else {
+      render();
+    }
+  }, err => console.error("bookings sync error:", err));
 }
 
 // ── Firebase Auth listener ────────────────────────
@@ -186,21 +208,10 @@ onAuthStateChanged(auth, user => {
   } else {
     S.adminAuthed    = false;
     S.adminUser      = null;
-    S.bookingsSynced = false;
+    // bookings sync хэвээр байлгана (хэрэглэгч гарахад ч захиалга харагдана)
   }
   if(S.page === "admin") render();
 });
-
-// ── Realtime sync (зөвхөн admin) ─────────────────
-function startBookingsSync(){
-  onSnapshot(collection(db,"bookings"), snap => {
-    S.bookings = snap.docs
-      .map(d=>({...d.data(), _docId:d.id}))
-      .sort((a,b)=>(b.createdAt||"").localeCompare(a.createdAt||""));
-    if(S.page==="admin" && S.adminAuthed) refreshAdminTable();
-    else render();
-  }, err => console.error("bookings sync error:", err));
-}
 
 async function refreshHolidays(){
   try{
@@ -370,12 +381,15 @@ function BookPage(){
       inner.appendChild(lbl({style:{display:"block",marginBottom:"12px",fontSize:"13px",fontWeight:"600",color:"#555"}},"Цаг сонгоно уу"));
       const tgrid = div({style:{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:"10px",marginBottom:"28px"}});
       SLOTS.forEach(t=>{
-        const used = slotUsed(S.date,t), left = MAX_SLOT-used, full = left<=0, sel = S.time===t;
+        const used = slotUsed(S.date,t);
+        const left = MAX_SLOT - used;
+        const full = left<=0;
+        const sel = S.time===t;
         const tb = btn({style:{border:"2px solid "+(sel?"#1a1a1a":full?"#f0e6de":"#e8ddd5"),borderRadius:"12px",padding:"12px 8px",background:sel?"#1a1a1a":full?"#fafafa":"#fff",color:sel?"#fff":full?"#ccc":"#1a1a1a",cursor:full?"not-allowed":"pointer"}});
         tb.disabled = full;
         tb.appendChild(p({style:{fontWeight:"700",fontSize:"15px"}},t));
         tb.appendChild(p({style:{fontSize:"11px",marginTop:"3px",color:sel?"#ddd":full?"#ccc":left<=2?"#f59e0b":"#6b7280"}},full?"Дүүрсэн":left+" суудал"));
-        tb.addEventListener("click",()=>{ S.time=t; render(); });
+        tb.addEventListener("click",()=>{ if(!full){ S.time=t; render(); } });
         tgrid.appendChild(tb);
       });
       inner.appendChild(tgrid);
@@ -392,7 +406,7 @@ function BookPage(){
     inner.appendChild(p({style:{color:"#888",marginBottom:"24px",fontSize:"14px"}},PKG.name+" · "+S.date+" · "+S.time));
 
     const usedNow = slotUsed(S.date, S.time);
-    const maxQty  = Math.max(1, MAX_SLOT - usedNow + (S.qty||1));
+    const maxQty  = Math.min(6, MAX_SLOT - usedNow);
     const qtyBox  = div({style:{background:"#f9f5ff",border:"1px solid #e9d5ff",borderRadius:"14px",padding:"16px 20px",marginBottom:"20px",display:"flex",alignItems:"center",justifyContent:"space-between"}});
     qtyBox.appendChild(lbl({style:{fontSize:"14px",fontWeight:"600",color:"#1a1a1a"}},"Хүний тоо"));
     const qrow = div({style:{display:"flex",alignItems:"center",gap:"16px"}});
@@ -407,8 +421,7 @@ function BookPage(){
     qtyBox.appendChild(qrow);
     inner.appendChild(qtyBox);
 
-    // Form fields — render хийхэд cursor байрлал хадгалахын тулд
-    // blur event-д state хадгална, focus алдагдахгүй
+    // Form fields
     [{key:"name",label:"Нэр",ph:"Таны нэр",type:"text"},
      {key:"phone",label:"Утас",ph:"99999999",type:"tel"},
      {key:"email",label:"И-мэйл",ph:"email@example.com",type:"email"}
@@ -417,9 +430,7 @@ function BookPage(){
       fw.appendChild(lbl({style:{display:"block",marginBottom:"7px",fontSize:"13px",fontWeight:"600",color:"#555"}},f.label));
       const fi = inp({type:f.type, placeholder:f.ph, value:S.form[f.key]||""});
       fi.style.borderColor = S.errors[f.key] ? "#f87171" : "#e8ddd5";
-      // input event: state-д хадгална, render дуудахгүй (cursor алдагдахгүй)
       fi.addEventListener("input", e=>{ S.form[f.key]=e.target.value; });
-      // blur event: алдааг арилгана
       fi.addEventListener("blur", ()=>{ if(S.errors[f.key]){ delete S.errors[f.key]; render(); } });
       fw.appendChild(fi);
       if(S.errors[f.key]) fw.appendChild(p({style:{fontSize:"12px",color:"#ef4444",marginTop:"4px"}},S.errors[f.key]));
@@ -505,8 +516,9 @@ function BookPage(){
           step:1, form:{name:"",phone:"",email:""},
           errors:{}, time:"", qty:1, loading:false
         });
+        showToast("Захиалга амжилттай илгээгдлээ!", "success");
       }catch(e){
-        console.error("addBooking алдаа:", e.code, e.message);
+        console.error("addBooking алдаа:", e);
         showToast("Захиалга хадгалахад алдаа гарлаа. Дахин оролдоно уу.", "error", 5000);
         setState({loading:false});
       }
@@ -634,12 +646,10 @@ function showEmailModal(booking){
   infoBox.innerHTML="✅ Захиалга баталгаажлаа! Доорх мэйлийн текстийг хуулаад <strong>"+booking.email+"</strong> хаяг руу илгээнэ үү.";
   modal.appendChild(infoBox);
 
-  // Мэйлийн текст — харагдах бөгөөд хуулж болно
   modal.appendChild(div({style:{background:"#f8f8f8",borderRadius:"10px",padding:"16px",fontSize:"13px",lineHeight:"1.7",whiteSpace:"pre-wrap",marginBottom:"16px",fontFamily:"monospace",userSelect:"text",border:"1px solid #e8ddd5"}},emailText));
 
   const btnRow = div({style:{display:"flex",gap:"8px"}});
 
-  // Текст хуулах товч
   const copyBtn = btn({style:{flex:"1",background:"#1a1a1a",color:"#fff",border:"none",borderRadius:"10px",padding:"12px",fontWeight:"600",fontSize:"13px"}},"📋 Текст хуулах");
   copyBtn.addEventListener("click",()=>{
     navigator.clipboard.writeText(emailText).then(()=>{
@@ -647,12 +657,10 @@ function showEmailModal(booking){
       copyBtn.style.background="#10b981";
       setTimeout(()=>{ copyBtn.textContent="📋 Текст хуулах"; copyBtn.style.background="#1a1a1a"; },2000);
     }).catch(()=>{
-      // clipboard API дэмжихгүй тохиолдолд
       showToast("Хуулахад алдаа гарлаа. Гараар сонгон хуулна уу.","error");
     });
   });
 
-  // Мэйл клиент нээх товч
   const mailBtn = btn({style:{flex:"1",background:"#c084a8",color:"#fff",border:"none",borderRadius:"10px",padding:"12px",fontWeight:"600",fontSize:"13px"}},"📨 Мэйл нээх");
   mailBtn.addEventListener("click",()=>{
     const subject = encodeURIComponent("Cakely - Захиалга баталгаажлаа #"+booking.id);
@@ -688,7 +696,6 @@ function buildAdminStats(){
 function buildAdminTable(){
   const wrap = div({});
 
-  // Filter buttons
   const filt = div({style:{display:"flex",gap:"7px",marginBottom:"16px",flexWrap:"wrap"}});
   [["all","Бүгд"],["pending","Хүлээгдэж буй"],["confirmed","Баталгаажсан"],["cancelled","Цуцлагдсан"]].forEach(item=>{
     filt.appendChild(btn({
@@ -729,12 +736,10 @@ function buildAdminTable(){
         tr.appendChild(el("td",{style:"padding:11px 14px;font-size:13px;"+(cell[1]||"")},String(cell[0]||"")));
       });
 
-      // Төлөв
       const std = el("td",{style:{padding:"11px 14px"}});
       std.appendChild(span({style:{background:STATUS_COLOR[b.status]+"22",color:STATUS_COLOR[b.status],borderRadius:"100px",padding:"3px 10px",fontSize:"11px",fontWeight:"700",whiteSpace:"nowrap"}},STATUS_LABEL[b.status]));
       tr.appendChild(std);
 
-      // Үйлдэл
       const atd = el("td",{style:{padding:"11px 14px"}});
       const abx = div({style:{display:"flex",gap:"5px",flexWrap:"wrap"}});
 
@@ -746,7 +751,6 @@ function buildAdminTable(){
             button.textContent="⏳..."; button.disabled=true; button.style.background="#6b7280";
             try{
               await DB.updateBooking(booking._docId, {status:"confirmed"});
-              // Мэйлийн текст modal харуулна
               showEmailModal(Object.assign({}, booking, {status:"confirmed"}));
               showToast("Захиалга баталгаажлаа!","success");
             }catch(err){
@@ -810,7 +814,7 @@ function AdminPage(){
     style:{background:"none",border:"1px solid #444",color:"#888",borderRadius:"8px",padding:"5px 12px",fontSize:"12px",marginLeft:"8px"},
     onClick: async ()=>{
       await signOut(auth);
-      setState({adminAuthed:false, adminUser:null, bookingsSynced:false});
+      setState({adminAuthed:false, adminUser:null});
     }
   },"Гарах"));
   topBar.appendChild(left); topBar.appendChild(right);
@@ -832,7 +836,6 @@ function AdminPage(){
     inner.appendChild(p({style:{color:"#999",fontSize:"14px",marginBottom:"36px"}},"Амралтын өдөр тохируулах ба өдрийн захиалгын байдал харах"));
     const cgrid = div({style:{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(320px,1fr))",gap:"28px"}});
 
-    // Амралтын өдрүүд
     const hCard = div({style:{background:"#fff",borderRadius:"18px",padding:"24px",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
     hCard.appendChild(h3({style:{fontSize:"15px",fontWeight:"700",marginBottom:"16px"}},"🛑 Амралтын өдрүүд"));
     const hRow = div({style:{display:"flex",gap:"8px",marginBottom:"16px"}});
@@ -863,7 +866,6 @@ function AdminPage(){
     }
     cgrid.appendChild(hCard);
 
-    // Өдрийн захиалгын байдал
     const sCard = div({style:{background:"#fff",borderRadius:"18px",padding:"24px",boxShadow:"0 1px 8px rgba(0,0,0,.05)"}});
     sCard.appendChild(h3({style:{fontSize:"15px",fontWeight:"700",marginBottom:"16px"}},"📊 Өдрийн захиалгын байдал"));
     const sInp = inp({type:"date",value:S.schedDate});
@@ -911,6 +913,7 @@ function render(){
 // ── Init ─────────────────────────────────────────
 async function init(){
   await refreshHolidays();
+  startBookingsSync(); // Бүх хэрэглэгчдэд sync эхлүүлэх
   document.getElementById("loading-screen").style.display="none";
   document.getElementById("app").style.display="block";
   render();
