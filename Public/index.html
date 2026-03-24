@@ -410,7 +410,7 @@ function BookPage(){
     // Form fields — render хийхэд cursor байрлал хадгалахын тулд
     // blur event-д state хадгална, focus алдагдахгүй
     [{key:"name",label:"Нэр",ph:"Таны нэр",type:"text"},
-     {key:"phone",label:"Утас",ph:"99999999 эсвэл +97699999999",type:"tel"},
+     {key:"phone",label:"Утас",ph:"99999999",type:"tel"},
      {key:"email",label:"И-мэйл",ph:"email@example.com",type:"email"}
     ].forEach(f=>{
       const fw = div({style:{marginBottom:"18px"}});
@@ -613,7 +613,7 @@ function buildEmailText(booking){
 📍 Хаяг: ${ADDRESS}
 📞 Утас: ${PHONE}
 
-Тантай уулзахдаа баяртай байна!
+Та цагаа бариарай. Баярлалаа!
 Cakely`;
 }
 
