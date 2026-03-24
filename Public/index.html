@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+,::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'DM Sans',sans-serif;background:#fffaf7;color:#1a1a1a;}
 .serif{font-family:'Cormorant Garamond',serif;}
 input,select{font-family:'DM Sans',sans-serif;outline:none;border:1.5px solid #e8ddd5;border-radius:10px;padding:11px 15px;font-size:14px;background:#fff;width:100%;transition:border-color .2s,box-shadow .2s;}
@@ -447,16 +447,19 @@ function BookPage(){
       setState({loading:true});
       var b={
         name:S.form.name, phone:S.form.phone, email:S.form.email,
-        date:S.date, time:S.time, qty:S.qty,
-        package:"solo", packageName:PKG.name,
-        price:PKG.price*S.qty,
-        id:uid(), status:"pending", createdAt:new Date().toISOString()
+        date:S.date, time:S.time,
+        qty:Number(S.qty),
+        price:Number(PKG.price*S.qty),
+        status:"pending", createdAt:new Date().toISOString()
       };
+      console.log("📦 Илгээж байна:", JSON.stringify(b));
       try{
         var saved=await DB.addBooking(b);
+        console.log("✅ Хадгалагдлаа:", saved._docId);
         setState({lastBook:saved, page:"success", step:1, form:{name:"",phone:"",email:""}, errors:{}, time:"", qty:1, loading:false});
       }catch(e){
-        alert("Захиалга хадгалахад алдаа гарлаа. Дахин оролдоно уу.\n"+e.message);
+        console.error("❌ addBooking алдаа:", e.code, e.message);
+        alert("Алдаа: "+e.code+"\n"+e.message);
         setState({loading:false});
       }
     });
